@@ -1,11 +1,11 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Test Coverage Report'
+description: 'Report Test Coverage to PR'
+author: 'Francisco Sanchez'
 inputs:
-  milliseconds: # change this
+  post-commit-comment:
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+    description: 'post comment on commit'
+    default: 'false'
 runs:
   using: 'node12'
   main: 'dist/index.js'
