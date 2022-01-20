@@ -1,16 +1,20 @@
 import * as core from '@actions/core'
-import {wait} from './wait'
+import * as github from '@actions/github'
 
 async function run(): Promise<void> {
   try {
-    const ms= '1000'
-    core.debug(`Waiting ${ms} milliseconds ...`) // debug is only output if you set the secret `ACTIONS_STEP_DEBUG` to true
+    const token = core.getInput('token', {required: true})
+    const octokit = github.getOctokit(token)
 
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    const message = 'Hello GitHub'
 
-    core.setOutput('time', new Date().toTimeString())
+    core.debug('Posting message to github: \n' + message)
+    octokit.rest.issues.createComment({
+      repo: github.context.repo.repo,
+      owner: github.context.repo.owner,
+      issue_number: github.context.payload.pull_request?.number || 0,
+      body: message
+    })
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }

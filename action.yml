@@ -2,8 +2,12 @@ name: 'Test Coverage Report'
 description: 'Report Test Coverage to PR'
 author: 'Francisco Sanchez'
 inputs:
+  token:
+    description: GitHub Access Token
+    required: false
+    default: ${{ github.token }}
   post-commit-comment:
-    required: true
+    required: false
     description: 'post comment on commit'
     default: 'false'
 runs:
