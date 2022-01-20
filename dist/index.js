@@ -48,7 +48,6 @@ class Action {
     }
     postComment(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            core.debug(`Posting message to github:\n${message}`);
             if (this.context.eventName === 'pull_request') {
                 yield this.postPullRequestComment(message);
             }
@@ -72,24 +71,76 @@ class Action {
     postPullRequestComment(message) {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
-            message += this.getPullRequestStamp();
             if ((_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number) {
-                const resp = yield this.octokit.rest.issues.createComment({
-                    repo: this.context.repo.repo,
-                    owner: this.context.repo.owner,
-                    issue_number: this.context.payload.pull_request.number,
-                    body: message
-                });
-                core.debug(`Post message status: ${resp.status}`);
-                core.debug(`Issue URL: ${resp.data.issue_url}`);
-                core.debug(`Message URL: ${resp.data.url}`);
-                core.debug(`Message HTML: ${resp.data.html_url}`);
+                message = this.getCommentTitle() + message;
+                let response;
+                const previousComments = yield this.listPreviousComments();
+                if (!previousComments.length) {
+                    core.debug(`No previous comments found, creating a new one...`);
+                    response = yield this.octokit.rest.issues.createComment({
+                        repo: this.context.repo.repo,
+                        owner: this.context.repo.owner,
+                        issue_number: this.context.payload.pull_request.number,
+                        body: message
+                    });
+                }
+                else {
+                    core.debug(`Previous comment found, updating...`);
+                    response = yield this.octokit.rest.issues.updateComment({
+                        repo: this.context.repo.repo,
+                        owner: this.context.repo.owner,
+                        comment_id: previousComments[0].id,
+                        body: message
+                    });
+                }
+                if (previousComments.length > 1) {
+                    const surplusComments = previousComments.slice(1);
+                    if (surplusComments.length)
+                        core.debug(`Removing surplus comments. (${surplusComments.length}`);
+                    for (const comment of surplusComments) {
+                        yield this.octokit.rest.issues.deleteComment({
+                            repo: this.context.repo.repo,
+                            owner: this.context.repo.owner,
+                            comment_id: comment.id
+                        });
+                    }
+                }
+                if (response) {
+                    core.debug(`Post message status: ${response.status}`);
+                    core.debug(`Issue URL: ${response.data.issue_url}`);
+                    core.debug(`Message URL: ${response.data.url}`);
+                    core.debug(`Message HTML: ${response.data.html_url}`);
+                }
             }
         });
     }
-    getPullRequestStamp() {
+    listPreviousComments() {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const per_page = 20;
+            let results = [];
+            let page = 1;
+            let response;
+            if ((_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number) {
+                do {
+                    response = yield this.octokit.rest.issues.listComments({
+                        repo: this.context.repo.repo,
+                        owner: this.context.repo.owner,
+                        issue_number: (_b = this.context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.number,
+                        page,
+                        per_page
+                    });
+                    results = [...results, ...response.data];
+                    page++;
+                } while (response.data.length === per_page);
+            }
+            return results.filter(comment => { var _a; return (_a = comment.body) === null || _a === void 0 ? void 0 : _a.includes(this.getCommentTitle()); });
+        });
+    }
+    getCommentTitle() {
         var _a;
-        return `<p hidden [data-pr-id='${(_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id}']>${this.title}</p>`;
+        const titleString = this.title ? ` | ${this.title}` : '';
+        return `<p [data-pr-id='${(_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id}']>Coverage Report${titleString}</p>\n`;
     }
 }
 exports.Action = Action;
