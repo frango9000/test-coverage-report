@@ -90,7 +90,7 @@ class Action {
                         repo: this.context.repo.repo,
                         owner: this.context.repo.owner,
                         comment_id: previousComments[0].id,
-                        body: message
+                        body: `${message}\nUpdated`
                     });
                 }
                 if (previousComments.length > 1) {
