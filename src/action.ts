@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
+import {Annotation, CheckResponse, IssueComment} from './interface'
 import {Context} from '@actions/github/lib/context'
 import {GitHub} from '@actions/github/lib/utils'
 
@@ -8,6 +9,9 @@ export class Action {
   readonly title = core.getInput('title')
   readonly disableComment =
     core.getInput('disable-comment', {required: true}).toLowerCase() === 'true'
+  readonly disableRunCheck =
+    core.getInput('disable-run-check', {required: true}).toLowerCase() ===
+    'true'
   readonly octokit: InstanceType<typeof GitHub>
   readonly context: Context
 
@@ -16,6 +20,14 @@ export class Action {
     this.context = github.context
 
     core.debug(JSON.stringify(this.context))
+  }
+
+  async run(): Promise<void> {
+    const check = await this.postRunCheck()
+
+    await this.postComment(check.html_url || '')
+
+    await this.updateRunCheck(check.id, 'success', 'Comment Posted on PR')
   }
 
   async postComment(message: string): Promise<void> {
@@ -28,37 +40,85 @@ export class Action {
     }
   }
 
+  async postRunCheck(): Promise<CheckResponse> {
+    const name = this.getTitle()
+    const resp = await this.octokit.rest.checks.create({
+      ...this.context.repo,
+      head_sha: this.context.sha,
+      name,
+      status: 'in_progress',
+      output: {
+        title: name,
+        summary: ''
+      }
+    })
+
+    core.debug(`Check run URL: ${resp.data.url}`)
+    core.debug(`Check run HTML: ${resp.data.html_url}`)
+    return resp.data
+  }
+
+  async updateRunCheck(
+    runId: number,
+    conclusion:
+      | 'action_required'
+      | 'cancelled'
+      | 'failure'
+      | 'neutral'
+      | 'success'
+      | 'skipped'
+      | 'timed_out',
+    summary: string,
+    annotations: Annotation[] = []
+  ): Promise<CheckResponse> {
+    const name = this.getTitle()
+    const icon = conclusion !== 'success' ? '✔' : '❌'
+    const resp = await this.octokit.rest.checks.update({
+      check_run_id: runId,
+      conclusion,
+      status: 'completed',
+      output: {
+        title: `${name} ${icon}`,
+        summary,
+        annotations
+      },
+      ...github.context.repo
+    })
+
+    core.debug(`Check run URL: ${resp.data.url}`)
+    core.debug(`Check run HTML: ${resp.data.html_url}`)
+    return resp.data
+  }
+
   private async postCommitComment(message: string): Promise<void> {
     const resp = await this.octokit.rest.repos.createCommitComment({
-      repo: this.context.repo.repo,
-      owner: this.context.repo.owner,
+      ...this.context.repo,
       commit_sha: this.context.sha,
       body: message
     })
+    core.debug(`Check run create response: ${resp.status}`)
     core.debug(`Comment URL: ${resp.data.url}`)
     core.debug(`Comment HTML: ${resp.data.html_url}`)
   }
 
   private async postPullRequestComment(message: string): Promise<void> {
     if (this.context.payload.pull_request?.number) {
-      message = this.getCommentTitle() + message
+      message = this.getHtmlTitle() + message
       let response
       const previousComments = await this.listPreviousComments()
       if (!previousComments.length) {
         core.debug(`No previous comments found, creating a new one...`)
         response = await this.octokit.rest.issues.createComment({
-          repo: this.context.repo.repo,
-          owner: this.context.repo.owner,
+          ...this.context.repo,
           issue_number: this.context.payload.pull_request.number,
           body: message
         })
       } else {
         core.debug(`Previous comment found, updating...`)
         response = await this.octokit.rest.issues.updateComment({
-          repo: this.context.repo.repo,
-          owner: this.context.repo.owner,
+          ...this.context.repo,
           comment_id: previousComments[0].id,
-          body: `${message}\n\n\n\nLast Update @ ${new Date().toUTCString()}`
+          body: `<p>${message}Last Update @ ${new Date().toUTCString()}<p>`
         })
       }
       if (previousComments.length > 1) {
@@ -67,8 +127,7 @@ export class Action {
           core.debug(`Removing surplus comments. (${surplusComments.length}`)
         for (const comment of surplusComments) {
           await this.octokit.rest.issues.deleteComment({
-            repo: this.context.repo.repo,
-            owner: this.context.repo.owner,
+            ...this.context.repo,
             comment_id: comment.id
           })
         }
@@ -90,8 +149,7 @@ export class Action {
     if (this.context.payload.pull_request?.number) {
       do {
         response = await this.octokit.rest.issues.listComments({
-          repo: this.context.repo.repo,
-          owner: this.context.repo.owner,
+          ...this.context.repo,
           issue_number: this.context.payload.pull_request?.number,
           page,
           per_page
@@ -101,20 +159,18 @@ export class Action {
       } while (response.data.length === per_page)
     }
     return results.filter(comment =>
-      comment.body?.includes(this.getCommentTitle())
+      comment.body?.includes(this.getHtmlTitle())
     )
   }
 
-  private getCommentTitle(): string {
-    const titleString = this.title ? ` | ${this.title}` : ''
-    return `<p [data-pr-id='${this.context.payload.pull_request?.id}']>Coverage Report${titleString}</p>\n`
+  private getHtmlTitle(): string {
+    return `<p [data-pr-id='${
+      this.context.payload.pull_request?.id
+    }']>${this.getTitle()}</p>\n`
   }
-}
 
-interface IssueComment {
-  id: number
-  body?: string
-  html_url: string
-  issue_url: string
-  url: string
+  private getTitle(): string {
+    const customTitle = this.title ? ` | ${this.title}` : ''
+    return `Test Coverage Report${customTitle}`
+  }
 }

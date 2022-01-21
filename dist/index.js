@@ -43,9 +43,18 @@ class Action {
         this.token = core.getInput('token', { required: true });
         this.title = core.getInput('title');
         this.disableComment = core.getInput('disable-comment', { required: true }).toLowerCase() === 'true';
+        this.disableRunCheck = core.getInput('disable-run-check', { required: true }).toLowerCase() ===
+            'true';
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
         core.debug(JSON.stringify(this.context));
+    }
+    run() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const check = yield this.postRunCheck();
+            yield this.postComment(check.html_url || '');
+            yield this.updateRunCheck(check.id, 'success', 'Comment Posted on PR');
+        });
     }
     postComment(message) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -59,14 +68,36 @@ class Action {
             }
         });
     }
+    postRunCheck() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const name = this.getTitle();
+            const resp = yield this.octokit.rest.checks.create(Object.assign(Object.assign({}, this.context.repo), { head_sha: this.context.sha, name, status: 'in_progress', output: {
+                    title: name,
+                    summary: ''
+                } }));
+            core.debug(`Check run URL: ${resp.data.url}`);
+            core.debug(`Check run HTML: ${resp.data.html_url}`);
+            return resp.data;
+        });
+    }
+    updateRunCheck(runId, conclusion, summary, annotations = []) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const name = this.getTitle();
+            const icon = conclusion !== 'success' ? '✔' : '❌';
+            const resp = yield this.octokit.rest.checks.update(Object.assign({ check_run_id: runId, conclusion, status: 'completed', output: {
+                    title: `${name} ${icon}`,
+                    summary,
+                    annotations
+                } }, github.context.repo));
+            core.debug(`Check run URL: ${resp.data.url}`);
+            core.debug(`Check run HTML: ${resp.data.html_url}`);
+            return resp.data;
+        });
+    }
     postCommitComment(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            const resp = yield this.octokit.rest.repos.createCommitComment({
-                repo: this.context.repo.repo,
-                owner: this.context.repo.owner,
-                commit_sha: this.context.sha,
-                body: message
-            });
+            const resp = yield this.octokit.rest.repos.createCommitComment(Object.assign(Object.assign({}, this.context.repo), { commit_sha: this.context.sha, body: message }));
+            core.debug(`Check run create response: ${resp.status}`);
             core.debug(`Comment URL: ${resp.data.url}`);
             core.debug(`Comment HTML: ${resp.data.html_url}`);
         });
@@ -75,37 +106,23 @@ class Action {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
             if ((_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number) {
-                message = this.getCommentTitle() + message;
+                message = this.getHtmlTitle() + message;
                 let response;
                 const previousComments = yield this.listPreviousComments();
                 if (!previousComments.length) {
                     core.debug(`No previous comments found, creating a new one...`);
-                    response = yield this.octokit.rest.issues.createComment({
-                        repo: this.context.repo.repo,
-                        owner: this.context.repo.owner,
-                        issue_number: this.context.payload.pull_request.number,
-                        body: message
-                    });
+                    response = yield this.octokit.rest.issues.createComment(Object.assign(Object.assign({}, this.context.repo), { issue_number: this.context.payload.pull_request.number, body: message }));
                 }
                 else {
                     core.debug(`Previous comment found, updating...`);
-                    response = yield this.octokit.rest.issues.updateComment({
-                        repo: this.context.repo.repo,
-                        owner: this.context.repo.owner,
-                        comment_id: previousComments[0].id,
-                        body: `${message}\n\n\n\nLast Update @ ${new Date().toUTCString()}`
-                    });
+                    response = yield this.octokit.rest.issues.updateComment(Object.assign(Object.assign({}, this.context.repo), { comment_id: previousComments[0].id, body: `<p>${message}Last Update @ ${new Date().toUTCString()}<p>` }));
                 }
                 if (previousComments.length > 1) {
                     const surplusComments = previousComments.slice(1);
                     if (surplusComments.length)
                         core.debug(`Removing surplus comments. (${surplusComments.length}`);
                     for (const comment of surplusComments) {
-                        yield this.octokit.rest.issues.deleteComment({
-                            repo: this.context.repo.repo,
-                            owner: this.context.repo.owner,
-                            comment_id: comment.id
-                        });
+                        yield this.octokit.rest.issues.deleteComment(Object.assign(Object.assign({}, this.context.repo), { comment_id: comment.id }));
                     }
                 }
                 if (response) {
@@ -126,24 +143,22 @@ class Action {
             let response;
             if ((_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number) {
                 do {
-                    response = yield this.octokit.rest.issues.listComments({
-                        repo: this.context.repo.repo,
-                        owner: this.context.repo.owner,
-                        issue_number: (_b = this.context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.number,
-                        page,
-                        per_page
-                    });
+                    response = yield this.octokit.rest.issues.listComments(Object.assign(Object.assign({}, this.context.repo), { issue_number: (_b = this.context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.number, page,
+                        per_page }));
                     results = [...results, ...response.data];
                     page++;
                 } while (response.data.length === per_page);
             }
-            return results.filter(comment => { var _a; return (_a = comment.body) === null || _a === void 0 ? void 0 : _a.includes(this.getCommentTitle()); });
+            return results.filter(comment => { var _a; return (_a = comment.body) === null || _a === void 0 ? void 0 : _a.includes(this.getHtmlTitle()); });
         });
     }
-    getCommentTitle() {
+    getHtmlTitle() {
         var _a;
-        const titleString = this.title ? ` | ${this.title}` : '';
-        return `<p [data-pr-id='${(_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id}']>Coverage Report${titleString}</p>\n`;
+        return `<p [data-pr-id='${(_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id}']>${this.getTitle()}</p>\n`;
+    }
+    getTitle() {
+        const customTitle = this.title ? ` | ${this.title}` : '';
+        return `Test Coverage Report${customTitle}`;
     }
 }
 exports.Action = Action;
@@ -191,7 +206,7 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const action = new action_1.Action();
-            yield action.postComment('Hello GitHub');
+            yield action.run();
         }
         catch (error) {
             core.debug(JSON.stringify(error));

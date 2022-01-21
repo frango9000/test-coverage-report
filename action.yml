@@ -13,6 +13,10 @@ inputs:
     required: false
     description: 'Disable comment post/update'
     default: 'false'
+  disable-run-check:
+    required: false
+    description: 'Disable comment post/update'
+    default: 'false'
 runs:
   using: 'node12'
   main: 'dist/index.js'
