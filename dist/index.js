@@ -42,17 +42,20 @@ class Action {
     constructor() {
         this.token = core.getInput('token', { required: true });
         this.title = core.getInput('title');
+        this.disableComment = core.getInput('disable-comment', { required: true }).toLowerCase() === 'true';
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
         core.debug(JSON.stringify(this.context));
     }
     postComment(message) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.context.eventName === 'pull_request') {
-                yield this.postPullRequestComment(message);
-            }
-            else if (this.context.eventName === 'push') {
-                yield this.postCommitComment(message);
+            if (!this.disableComment) {
+                if (this.context.eventName === 'pull_request') {
+                    yield this.postPullRequestComment(message);
+                }
+                else if (this.context.eventName === 'push') {
+                    yield this.postCommitComment(message);
+                }
             }
         });
     }
@@ -64,8 +67,8 @@ class Action {
                 commit_sha: this.context.sha,
                 body: message
             });
-            core.debug(`Message URL: ${resp.data.url}`);
-            core.debug(`Message HTML: ${resp.data.html_url}`);
+            core.debug(`Comment URL: ${resp.data.url}`);
+            core.debug(`Comment HTML: ${resp.data.html_url}`);
         });
     }
     postPullRequestComment(message) {
@@ -108,8 +111,8 @@ class Action {
                 if (response) {
                     core.debug(`Post message status: ${response.status}`);
                     core.debug(`Issue URL: ${response.data.issue_url}`);
-                    core.debug(`Message URL: ${response.data.url}`);
-                    core.debug(`Message HTML: ${response.data.html_url}`);
+                    core.debug(`Comment URL: ${response.data.url}`);
+                    core.debug(`Comment HTML: ${response.data.html_url}`);
                 }
             }
         });

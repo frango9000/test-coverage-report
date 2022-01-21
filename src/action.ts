@@ -6,6 +6,8 @@ import {GitHub} from '@actions/github/lib/utils'
 export class Action {
   readonly token = core.getInput('token', {required: true})
   readonly title = core.getInput('title')
+  readonly disableComment =
+    core.getInput('disable-comment', {required: true}).toLowerCase() === 'true'
   readonly octokit: InstanceType<typeof GitHub>
   readonly context: Context
 
@@ -17,10 +19,12 @@ export class Action {
   }
 
   async postComment(message: string): Promise<void> {
-    if (this.context.eventName === 'pull_request') {
-      await this.postPullRequestComment(message)
-    } else if (this.context.eventName === 'push') {
-      await this.postCommitComment(message)
+    if (!this.disableComment) {
+      if (this.context.eventName === 'pull_request') {
+        await this.postPullRequestComment(message)
+      } else if (this.context.eventName === 'push') {
+        await this.postCommitComment(message)
+      }
     }
   }
 
@@ -31,8 +35,8 @@ export class Action {
       commit_sha: this.context.sha,
       body: message
     })
-    core.debug(`Message URL: ${resp.data.url}`)
-    core.debug(`Message HTML: ${resp.data.html_url}`)
+    core.debug(`Comment URL: ${resp.data.url}`)
+    core.debug(`Comment HTML: ${resp.data.html_url}`)
   }
 
   private async postPullRequestComment(message: string): Promise<void> {
@@ -72,8 +76,8 @@ export class Action {
       if (response) {
         core.debug(`Post message status: ${response.status}`)
         core.debug(`Issue URL: ${response.data.issue_url}`)
-        core.debug(`Message URL: ${response.data.url}`)
-        core.debug(`Message HTML: ${response.data.html_url}`)
+        core.debug(`Comment URL: ${response.data.url}`)
+        core.debug(`Comment HTML: ${response.data.html_url}`)
       }
     }
   }

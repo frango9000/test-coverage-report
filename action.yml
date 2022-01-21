@@ -9,9 +9,9 @@ inputs:
   title:
     description: 'Title to add to the comment'
     required: false
-  post-commit-comment:
+  disable-comment:
     required: false
-    description: 'post comment on commit'
+    description: 'Disable comment post/update'
     default: 'false'
 runs:
   using: 'node12'
