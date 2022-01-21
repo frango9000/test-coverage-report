@@ -3,6 +3,7 @@ import * as github from '@actions/github'
 import {Annotation, CheckResponse, IssueComment} from './interface'
 import {Context} from '@actions/github/lib/context'
 import {GitHub} from '@actions/github/lib/utils'
+import {html} from './html'
 
 export class Action {
   readonly token = core.getInput('token', {required: true})
@@ -72,7 +73,7 @@ export class Action {
     annotations: Annotation[] = []
   ): Promise<CheckResponse> {
     const name = this.getTitle()
-    const icon = conclusion !== 'success' ? '✔' : '❌'
+    const icon = conclusion === 'success' ? '✔' : '❌'
     const resp = await this.octokit.rest.checks.update({
       check_run_id: runId,
       conclusion,
@@ -164,9 +165,10 @@ export class Action {
   }
 
   private getHtmlTitle(): string {
-    return `<p [data-pr-id='${
-      this.context.payload.pull_request?.id
-    }']>${this.getTitle()}</p>\n`
+    return html.p(
+      {'data-id': this.context.payload.pull_request?.id},
+      this.getTitle()
+    )
   }
 
   private getTitle(): string {

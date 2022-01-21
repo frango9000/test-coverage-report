@@ -38,6 +38,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Action = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
+const html_1 = __nccwpck_require__(8444);
 class Action {
     constructor() {
         this.token = core.getInput('token', { required: true });
@@ -83,7 +84,7 @@ class Action {
     updateRunCheck(runId, conclusion, summary, annotations = []) {
         return __awaiter(this, void 0, void 0, function* () {
             const name = this.getTitle();
-            const icon = conclusion !== 'success' ? '✔' : '❌';
+            const icon = conclusion === 'success' ? '✔' : '❌';
             const resp = yield this.octokit.rest.checks.update(Object.assign({ check_run_id: runId, conclusion, status: 'completed', output: {
                     title: `${name} ${icon}`,
                     summary,
@@ -154,7 +155,7 @@ class Action {
     }
     getHtmlTitle() {
         var _a;
-        return `<p [data-pr-id='${(_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id}']>${this.getTitle()}</p>\n`;
+        return html_1.html.p({ 'data-id': (_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id }, this.getTitle());
     }
     getTitle() {
         const customTitle = this.title ? ` | ${this.title}` : '';
@@ -162,6 +163,66 @@ class Action {
     }
 }
 exports.Action = Action;
+
+
+/***/ }),
+
+/***/ 8444:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.html = exports.th = exports.td = exports.tr = exports.tbody = exports.table = exports.summary = exports.details = exports.h3 = exports.h2 = exports.h1 = exports.span = exports.div = exports.b = exports.p = exports.a = exports.fragment = void 0;
+function tag(name) {
+    return (...children) => {
+        let props = '';
+        const firstChild = children[0];
+        if (typeof firstChild === 'object') {
+            props = Object.keys(firstChild)
+                .map(key => ` ${key}='${firstChild[key]}'`)
+                .join('');
+        }
+        const content = typeof firstChild === 'string' ? children : children.slice(1);
+        return `<${name}${props}>${content.join('')}</${name}>`;
+    };
+}
+function fragment(...children) {
+    return children.join('');
+}
+exports.fragment = fragment;
+exports.a = tag('a');
+exports.p = tag('p');
+exports.b = tag('b');
+exports.div = tag('div');
+exports.span = tag('span');
+exports.h1 = tag('h1');
+exports.h2 = tag('h2');
+exports.h3 = tag('h3');
+exports.details = tag('details');
+exports.summary = tag('summary');
+exports.table = tag('table');
+exports.tbody = tag('tbody');
+exports.tr = tag('tr');
+exports.td = tag('td');
+exports.th = tag('th');
+exports.html = {
+    a: exports.a,
+    p: exports.p,
+    b: exports.b,
+    div: exports.div,
+    span: exports.span,
+    h1: exports.h1,
+    h2: exports.h2,
+    h3: exports.h3,
+    details: exports.details,
+    summary: exports.summary,
+    table: exports.table,
+    tbody: exports.tbody,
+    tr: exports.tr,
+    td: exports.td,
+    th: exports.th
+};
 
 
 /***/ }),
