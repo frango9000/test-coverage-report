@@ -93,7 +93,7 @@ class Action {
                         repo: this.context.repo.repo,
                         owner: this.context.repo.owner,
                         comment_id: previousComments[0].id,
-                        body: `${message}\nUpdated Comment`
+                        body: `${message}\n\nLast Update @ ${new Date().toTimeString()}`
                     });
                 }
                 if (previousComments.length > 1) {
