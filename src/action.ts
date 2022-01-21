@@ -58,7 +58,7 @@ export class Action {
           repo: this.context.repo.repo,
           owner: this.context.repo.owner,
           comment_id: previousComments[0].id,
-          body: `${message}\n\nLast Update @ ${new Date().toTimeString()}`
+          body: `${message}\n\n\n\nLast Update @ ${new Date().toUTCString()}`
         })
       }
       if (previousComments.length > 1) {
