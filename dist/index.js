@@ -47,9 +47,7 @@ class Action {
         this.coverageFiles = (0, utils_1.getInputAsArray)(interface_1.Inputs.COVERAGE_FILES, {
             required: true
         });
-        this.coverageTypes = (0, utils_1.getInputAsArray)(interface_1.Inputs.COVERAGE_TYPES, {
-            required: true
-        });
+        this.coverageTypes = (0, utils_1.getInputAsArray)(interface_1.Inputs.COVERAGE_TYPES) || [];
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
         core.debug(JSON.stringify(this.context));
