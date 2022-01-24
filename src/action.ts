@@ -20,9 +20,8 @@ export class Action {
   readonly coverageFiles: string[] = getInputAsArray(Inputs.COVERAGE_FILES, {
     required: true
   })
-  readonly coverageTypes: string[] = getInputAsArray(Inputs.COVERAGE_TYPES, {
-    required: true
-  })
+  readonly coverageTypes: string[] =
+    getInputAsArray(Inputs.COVERAGE_TYPES) || []
   readonly octokit: InstanceType<typeof GitHub>
   readonly context: Context
 

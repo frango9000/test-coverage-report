@@ -19,19 +19,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
       - uses: ./
         with:
           title: 'Jacoco Coverage'
           coverage-files: |
             ./__tests__/__fixtures__/jacoco.xml
+
       - uses: ./
         with:
           title: 'Lcov Coverage'
           coverage-files: |
             ./__tests__/__fixtures__/lcov.info
+
       - uses: ./
         with:
           title: 'Coverage Multi Report'
           coverage-files: |
             ./__tests__/__fixtures__/jacoco.xml
             ./__tests__/__fixtures__/lcov.info
+          coverage-types: |
+            jacoco
+            lcov
