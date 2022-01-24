@@ -1,18 +1,28 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {Annotation, CheckResponse, IssueComment} from './interface'
+import {Annotation, CheckResponse, Inputs, IssueComment} from './interface'
+import {div, p} from '@frango9000/html-builder'
+import {getInputAsArray, getInputAsBoolean} from './utils'
 import {Context} from '@actions/github/lib/context'
+import {CoverageReport} from './coverage-report'
 import {GitHub} from '@actions/github/lib/utils'
-import {html} from './html'
+import {Renderer} from './renderer'
 
 export class Action {
-  readonly token = core.getInput('token', {required: true})
-  readonly title = core.getInput('title')
-  readonly disableComment =
-    core.getInput('disable-comment', {required: true}).toLowerCase() === 'true'
-  readonly disableRunCheck =
-    core.getInput('disable-run-check', {required: true}).toLowerCase() ===
-    'true'
+  readonly token = core.getInput(Inputs.TOKEN, {required: true})
+  readonly title = core.getInput(Inputs.TITLE)
+  readonly disableComment = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
+    required: true
+  })
+  readonly disableBuildFail = getInputAsBoolean(Inputs.DISABLE_BUILD_FAIL, {
+    required: true
+  })
+  readonly coverageFiles: string[] = getInputAsArray(Inputs.COVERAGE_FILES, {
+    required: true
+  })
+  readonly coverageTypes: string[] = getInputAsArray(Inputs.COVERAGE_TYPES, {
+    required: true
+  })
   readonly octokit: InstanceType<typeof GitHub>
   readonly context: Context
 
@@ -24,11 +34,16 @@ export class Action {
   }
 
   async run(): Promise<void> {
+    if (!this.coverageFiles && !this.disableBuildFail)
+      core.setFailed('No Coverage Files Found')
+
     const check = await this.postRunCheck()
 
-    await this.postComment(check.html_url || '')
+    const message = await this.getAggregatedReports()
 
-    await this.updateRunCheck(check.id, 'success', 'Comment Posted on PR')
+    await this.postComment(message)
+
+    await this.updateRunCheck(check.id, 'success', message)
   }
 
   async postComment(message: string): Promise<void> {
@@ -50,7 +65,7 @@ export class Action {
       status: 'in_progress',
       output: {
         title: name,
-        summary: ''
+        summary: 'In progress...'
       }
     })
 
@@ -104,24 +119,25 @@ export class Action {
 
   private async postPullRequestComment(message: string): Promise<void> {
     if (this.context.payload.pull_request?.number) {
-      message = this.getHtmlTitle() + message
       let response
       const previousComments = await this.listPreviousComments()
+
       if (!previousComments.length) {
         core.debug(`No previous comments found, creating a new one...`)
         response = await this.octokit.rest.issues.createComment({
           ...this.context.repo,
           issue_number: this.context.payload.pull_request.number,
-          body: message
+          body: this.getHtmlTitle() + message
         })
       } else {
         core.debug(`Previous comment found, updating...`)
         response = await this.octokit.rest.issues.updateComment({
           ...this.context.repo,
           comment_id: previousComments[0].id,
-          body: `<p>${message}Last Update @ ${new Date().toUTCString()}<p>`
+          body: this.getHtmlTitle() + message + this.getUpdateFooter()
         })
       }
+
       if (previousComments.length > 1) {
         const surplusComments = previousComments.slice(1)
         if (surplusComments.length)
@@ -140,6 +156,10 @@ export class Action {
         core.debug(`Comment HTML: ${response.data.html_url}`)
       }
     }
+  }
+
+  private getUpdateFooter(): string {
+    return `<p>Last Update @ ${new Date().toUTCString()}<p>`
   }
 
   private async listPreviousComments(): Promise<IssueComment[]> {
@@ -165,7 +185,7 @@ export class Action {
   }
 
   private getHtmlTitle(): string {
-    return html.p(
+    return p(
       {'data-id': this.context.payload.pull_request?.id},
       this.getTitle()
     )
@@ -174,5 +194,25 @@ export class Action {
   private getTitle(): string {
     const customTitle = this.title ? ` | ${this.title}` : ''
     return `Test Coverage Report${customTitle}`
+  }
+
+  private async getAggregatedReports(): Promise<string> {
+    let aggregatedReport = ''
+
+    for (let i = 0; i < this.coverageFiles.length; i++) {
+      const reporter = await new CoverageReport(
+        this.coverageFiles[i],
+        this.coverageTypes[i] || null
+      ).init()
+
+      const renderer = new Renderer(
+        reporter,
+        this.context.repo.repo,
+        this.context.payload.after
+      )
+
+      aggregatedReport += div(renderer.renderCoverage())
+    }
+    return aggregatedReport
   }
 }
