@@ -8,9 +8,10 @@ export enum ReportExtension {
   LCOV = 'info'
 }
 
-export const SupportedReports = Object.values(ReportType).map(value =>
-  String(value)
-)
+export const SupportedReports = [
+  ...Object.values(ReportType).map(value => String(value)),
+  'global'
+]
 
 export interface CheckResponse {
   id: number

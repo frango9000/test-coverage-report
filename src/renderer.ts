@@ -2,7 +2,8 @@ import {
   a,
   details,
   fragment,
-  p,
+  hr,
+  span,
   summary,
   table,
   tbody,
@@ -16,40 +17,68 @@ import {FileCoverageReport} from './interface'
 
 export class Renderer {
   constructor(
-    private readonly reporter: CoverageReport,
     private readonly repository: string,
-    private readonly commit: string
+    private readonly commit: string,
+    private readonly reports: CoverageReport[],
+    private readonly globalReport?: CoverageReport | null
   ) {}
 
-  renderCoverage(): string {
-    return fragment(this.renderOverallCoverage(), this.renderFilesCoverage())
+  render(): string {
+    if (!this.reports?.length) {
+      return span('No Coverage Reports Found')
+    }
+    let render = this.renderReports(this.reports)
+    if (this.reports.length > 1 && this.globalReport) {
+      render = fragment(
+        this.renderGlobalReport(this.globalReport),
+        details(summary('Expand Global Report'), render)
+      )
+    }
+
+    return render
   }
 
-  private renderOverallCoverage(): string {
+  private renderReports(reports: CoverageReport[]): string {
+    let reportRender = ''
+    for (let i = 0; i < reports.length; i++) {
+      const report = reports[i]
+      reportRender += fragment(
+        this.renderOverallCoverage(report, 'Report'),
+        this.renderFilesCoverage(report),
+        i !== reports.length - 1 ? hr() : ''
+      )
+    }
+    return reportRender
+  }
+
+  private renderOverallCoverage(
+    report: CoverageReport,
+    firstTh: string
+  ): string {
     return table(
-      this.tableHeader(),
-      tbody(this.coverageRow(this.reporter.overallReport))
+      this.tableHeader(firstTh),
+      tbody(this.renderCoverageRow(report.overallReport))
     )
   }
 
-  private renderFilesCoverage(): string {
+  private renderFilesCoverage(report: CoverageReport): string {
     return details(
       summary('Expand Report'),
       table(
-        this.tableHeader(),
+        this.tableHeader('File Coverage'),
         tbody(
-          ...this.reporter.filesReport.map(fileReport =>
-            this.coverageRow(fileReport)
+          ...report.filesReport.map(fileReport =>
+            this.renderCoverageRow(fileReport)
           )
         )
       )
     )
   }
 
-  private tableHeader(): string {
-    return tr(
-      thead(
-        td(),
+  private tableHeader(firstTh = ''): string {
+    return thead(
+      tr(
+        th(firstTh),
         th('Statements'),
         th('Lines'),
         th('Functions'),
@@ -58,14 +87,14 @@ export class Renderer {
     )
   }
 
-  private coverageRow(file: FileCoverageReport): string {
+  private renderCoverageRow(file: FileCoverageReport): string {
     const prefix = process.env.GITHUB_WORKSPACE?.replace(/\\/g, '/')
     const relative = prefix && file.file?.replace(prefix, '')
     const href = `https://github.com/${this.repository}/blob/${this.commit}/${relative}`
 
     const title = file.file
       ? a({href}, file?.title || ``)
-      : p(file?.title || '')
+      : a(file?.title || '')
     return !file
       ? ''
       : tr(
@@ -75,5 +104,12 @@ export class Renderer {
           td(`${file.functions?.percentage}%`),
           td(`${file.branches?.percentage}%`)
         )
+  }
+
+  private renderGlobalReport(globalReport: CoverageReport): string {
+    return fragment(
+      table(this.renderOverallCoverage(globalReport, 'Global')),
+      hr()
+    )
   }
 }

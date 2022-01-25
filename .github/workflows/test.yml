@@ -15,6 +15,13 @@ jobs:
           npm install
       - run: |
           npm run all
+
+      - uses: ./
+        with:
+          title: 'Source Code Coverage'
+          coverage-files: |
+            ./coverage/lcov.info
+
   test: # make sure the action works on a clean machine without building
     runs-on: ubuntu-latest
     steps:
@@ -22,19 +29,19 @@ jobs:
 
       - uses: ./
         with:
-          title: 'Jacoco Coverage'
+          title: 'Jacoco Fixture Coverage'
           coverage-files: |
             ./__tests__/__fixtures__/jacoco.xml
 
       - uses: ./
         with:
-          title: 'Lcov Coverage'
+          title: 'Lcov Fixture Coverage'
           coverage-files: |
             ./__tests__/__fixtures__/lcov.info
 
       - uses: ./
         with:
-          title: 'Coverage Multi Report'
+          title: 'Multi Fixture Coverage'
           coverage-files: |
             ./__tests__/__fixtures__/jacoco.xml
             ./__tests__/__fixtures__/lcov.info

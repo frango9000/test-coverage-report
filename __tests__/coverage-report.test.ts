@@ -1,6 +1,7 @@
 import {CoverageReport} from '../src/coverage-report'
 import {ReportExtension, ReportType} from '../src/interface'
 import {
+  mockGlobalReport,
   mockJacocoFilesReport,
   mockJacocoOverallReport,
   mockLcovFilesReport,
@@ -59,15 +60,7 @@ describe('Coverage Report Class', () => {
       expect(coverageReport.overallReport).toBeTruthy()
       expect(coverageReport.overallReport.lines).toBeTruthy()
       expect(coverageReport.filesReport).toHaveLength(3)
-      expect(coverageReport.filesReport[0]).toStrictEqual(
-        mockJacocoFilesReport[0]
-      )
-      expect(coverageReport.filesReport[1]).toStrictEqual(
-        mockJacocoFilesReport[1]
-      )
-      expect(coverageReport.filesReport[2]).toStrictEqual(
-        mockJacocoFilesReport[2]
-      )
+      expect(coverageReport.filesReport).toStrictEqual(mockJacocoFilesReport)
     })
 
     it('should load and enhance overall report data on init', async () => {
@@ -92,21 +85,57 @@ describe('Coverage Report Class', () => {
       expect(coverageReport.overallReport).toBeTruthy()
       expect(coverageReport.overallReport.lines).toBeTruthy()
       expect(coverageReport.filesReport).toHaveLength(4)
-      expect(coverageReport.filesReport[0]).toStrictEqual(
-        mockLcovFilesReport[0]
-      )
-      expect(coverageReport.filesReport[1]).toStrictEqual(
-        mockLcovFilesReport[1]
-      )
-      expect(coverageReport.filesReport[2]).toStrictEqual(
-        mockLcovFilesReport[2]
-      )
+      expect(coverageReport.filesReport).toStrictEqual(mockLcovFilesReport)
     })
 
     it('should load and enhance overall report data on init', async () => {
       await coverageReport.init()
       expect(coverageReport.overallReport).toBeTruthy()
       expect(coverageReport.overallReport).toStrictEqual(mockLcovOverallReport)
+    })
+  })
+
+  describe('Static Methods', () => {
+    let coverageReports: CoverageReport[]
+
+    beforeEach(async () => {
+      coverageReports = await CoverageReport.generateFileReports(
+        [
+          './__tests__/__fixtures__/jacoco.xml',
+          './__tests__/__fixtures__/lcov.info'
+        ],
+        [ReportType.JACOCO, ReportType.LCOV]
+      )
+    })
+
+    it('should generate multiple file reports', () => {
+      expect(coverageReports).toHaveLength(2)
+      expect(coverageReports[0].filesReport).toStrictEqual(
+        mockJacocoFilesReport
+      )
+      expect(coverageReports[0].overallReport).toStrictEqual(
+        mockJacocoOverallReport
+      )
+      expect(coverageReports[1].filesReport).toStrictEqual(mockLcovFilesReport)
+      expect(coverageReports[1].overallReport).toStrictEqual(
+        mockLcovOverallReport
+      )
+    })
+
+    it('should generate global report', () => {
+      expect(
+        CoverageReport.generateGlobalReport(coverageReports)?.overallReport
+      ).toStrictEqual(mockGlobalReport)
+    })
+
+    it('should return null if there are less than 2 reports', () => {
+      expect(CoverageReport.generateGlobalReport([])).toBeNull()
+      expect(
+        CoverageReport.generateGlobalReport([null as unknown as CoverageReport])
+      ).toBeNull()
+      expect(
+        CoverageReport.generateGlobalReport([{} as unknown as CoverageReport])
+      ).toBeNull()
     })
   })
 })

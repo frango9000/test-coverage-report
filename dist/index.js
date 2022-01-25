@@ -30,10 +30,10 @@ exports.Action = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 const interface_1 = __nccwpck_require__(8201);
-const html_builder_1 = __nccwpck_require__(2002);
 const utils_1 = __nccwpck_require__(918);
 const coverage_report_1 = __nccwpck_require__(3963);
 const renderer_1 = __nccwpck_require__(3075);
+const html_builder_1 = __nccwpck_require__(2002);
 class Action {
     constructor() {
         this.token = core.getInput(interface_1.Inputs.TOKEN, { required: true });
@@ -56,9 +56,11 @@ class Action {
         if (!this.coverageFiles && !this.disableBuildFail)
             core.setFailed('No Coverage Files Found');
         const check = await this.postRunCheck();
-        const message = await this.getAggregatedReports();
-        await this.postComment(message);
-        await this.updateRunCheck(check.id, 'success', message);
+        const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.coverageFiles, this.coverageTypes);
+        const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
+        const render = new renderer_1.Renderer(this.context.repo.repo, this.context.payload.after, generatedReports, globalReport).render();
+        await this.postComment(render);
+        await this.updateRunCheck(check.id, 'success', render);
     }
     async postComment(message) {
         if (!this.disableComment) {
@@ -108,7 +110,7 @@ class Action {
         const resp = await this.octokit.rest.repos.createCommitComment({
             ...this.context.repo,
             commit_sha: this.context.sha,
-            body: message
+            body: this.getMessageHeader() + message
         });
         core.debug(`Check run create response: ${resp.status}`);
         core.debug(`Comment URL: ${resp.data.url}`);
@@ -124,7 +126,7 @@ class Action {
                 response = await this.octokit.rest.issues.createComment({
                     ...this.context.repo,
                     issue_number: this.context.payload.pull_request.number,
-                    body: this.getHtmlTitle() + message
+                    body: this.getMessageHeader() + message
                 });
             }
             else {
@@ -132,7 +134,7 @@ class Action {
                 response = await this.octokit.rest.issues.updateComment({
                     ...this.context.repo,
                     comment_id: previousComments[0].id,
-                    body: this.getHtmlTitle() + message + this.getUpdateFooter()
+                    body: this.getMessageHeader() + message + this.getUpdateFooter()
                 });
             }
             if (previousComments.length > 1) {
@@ -154,9 +156,6 @@ class Action {
             }
         }
     }
-    getUpdateFooter() {
-        return `<p>Last Update @ ${new Date().toUTCString()}<p>`;
-    }
     async listPreviousComments() {
         var _a, _b;
         const per_page = 20;
@@ -175,24 +174,18 @@ class Action {
                 page++;
             } while (response.data.length === per_page);
         }
-        return results.filter(comment => { var _a; return (_a = comment.body) === null || _a === void 0 ? void 0 : _a.includes(this.getHtmlTitle()); });
+        return results.filter(comment => { var _a; return (_a = comment.body) === null || _a === void 0 ? void 0 : _a.includes(this.getMessageHeader()); });
     }
-    getHtmlTitle() {
+    getMessageHeader() {
         var _a;
         return (0, html_builder_1.p)({ 'data-id': (_a = this.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.id }, this.getTitle());
     }
     getTitle() {
-        const customTitle = this.title ? ` | ${this.title}` : '';
-        return `Test Coverage Report${customTitle}`;
+        const customTitle = this.title ? `${this.title} | ` : '';
+        return `${customTitle}Coverage Report`;
     }
-    async getAggregatedReports() {
-        let aggregatedReport = '';
-        for (let i = 0; i < this.coverageFiles.length; i++) {
-            const reporter = await new coverage_report_1.CoverageReport(this.coverageFiles[i], this.coverageTypes[i] || null).init();
-            const renderer = new renderer_1.Renderer(reporter, this.context.repo.repo, this.context.payload.after);
-            aggregatedReport += (0, html_builder_1.div)(renderer.renderCoverage());
-        }
-        return aggregatedReport;
+    getUpdateFooter() {
+        return (0, html_builder_1.p)(`Last Update @ ${new Date().toUTCString()}`);
     }
 }
 exports.Action = Action;
@@ -201,12 +194,32 @@ exports.Action = Action;
 /***/ }),
 
 /***/ 3963:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CoverageReport = void 0;
+const core = __importStar(__nccwpck_require__(2186));
 const interface_1 = __nccwpck_require__(8201);
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
 const coverageParser = __nccwpck_require__(2879);
@@ -240,18 +253,28 @@ class CoverageReport {
     get filesReport() {
         return this._filesReport;
     }
+    set filesReport(value) {
+        this._filesReport = value;
+    }
     async init() {
         this._filesReport = await coverageParser.parseFile(this.path, {
             type: this.type
         });
+        this.enhanceFileReports();
+        this.generateOverallReport();
+        return this;
+    }
+    enhanceFileReports() {
         for (const fileCoverageReport of this._filesReport) {
             this.enhanceCoverageReport(fileCoverageReport);
         }
+    }
+    generateOverallReport() {
         this._overallReport = this.measureOverallReport(this._filesReport);
         this.enhanceCoverageReport(this._overallReport);
-        return this;
     }
     enhanceCoverageReport(fileCoverageReport) {
+        var _a, _b;
         fileCoverageReport.statements = this.getStatement(fileCoverageReport);
         fileCoverageReport.statements.percentage = this.measurePercentage(fileCoverageReport.statements);
         delete fileCoverageReport.branches.details;
@@ -260,6 +283,11 @@ class CoverageReport {
         fileCoverageReport.lines.percentage = this.measurePercentage(fileCoverageReport.lines);
         delete fileCoverageReport.functions.details;
         fileCoverageReport.functions.percentage = this.measurePercentage(fileCoverageReport.functions);
+        fileCoverageReport.file = (_a = fileCoverageReport.file) === null || _a === void 0 ? void 0 : _a.replace(/\\/g, '/');
+        if (!fileCoverageReport.title) {
+            fileCoverageReport.title =
+                ((_b = fileCoverageReport.file) === null || _b === void 0 ? void 0 : _b.split('/').pop()) || 'No Filename';
+        }
     }
     getStatement(fileReport) {
         const { branches, functions, lines } = fileReport;
@@ -300,9 +328,28 @@ class CoverageReport {
             lines: { hit: 0, found: 0 },
             branches: { hit: 0, found: 0 }
         });
-        overallCoverageReport.title = 'Overall Coverage';
+        core.debug(this.path);
+        overallCoverageReport.title = this.path.split('/').pop();
         overallCoverageReport.statements = this.getStatement(overallCoverageReport);
         return overallCoverageReport;
+    }
+    static async generateFileReports(files, types) {
+        const coverageReports = [];
+        for (let i = 0; i < files.length; i++) {
+            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null).init();
+            coverageReports.push(coverageReport);
+        }
+        return coverageReports;
+    }
+    static generateGlobalReport(generatedReports) {
+        if (generatedReports.length > 1) {
+            const globalReport = new CoverageReport('', 'global');
+            globalReport.filesReport = generatedReports.map(reports => reports.overallReport);
+            globalReport.generateOverallReport();
+            globalReport.overallReport.title = 'Global Report';
+            return globalReport;
+        }
+        return null;
     }
 }
 exports.CoverageReport = CoverageReport;
@@ -327,7 +374,10 @@ var ReportExtension;
     ReportExtension["JACOCO"] = "xml";
     ReportExtension["LCOV"] = "info";
 })(ReportExtension = exports.ReportExtension || (exports.ReportExtension = {}));
-exports.SupportedReports = Object.values(ReportType).map(value => String(value));
+exports.SupportedReports = [
+    ...Object.values(ReportType).map(value => String(value)),
+    'global'
+];
 var Inputs;
 (function (Inputs) {
     Inputs["TOKEN"] = "token";
@@ -393,34 +443,54 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Renderer = void 0;
 const html_builder_1 = __nccwpck_require__(2002);
 class Renderer {
-    constructor(reporter, repository, commit) {
-        this.reporter = reporter;
+    constructor(repository, commit, reports, globalReport) {
         this.repository = repository;
         this.commit = commit;
+        this.reports = reports;
+        this.globalReport = globalReport;
     }
-    renderCoverage() {
-        return (0, html_builder_1.fragment)(this.renderOverallCoverage(), this.renderFilesCoverage());
+    render() {
+        var _a;
+        if (!((_a = this.reports) === null || _a === void 0 ? void 0 : _a.length)) {
+            return (0, html_builder_1.span)('No Coverage Reports Found');
+        }
+        let render = this.renderReports(this.reports);
+        if (this.reports.length > 1 && this.globalReport) {
+            render = (0, html_builder_1.fragment)(this.renderGlobalReport(this.globalReport), (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Global Report'), render));
+        }
+        return render;
     }
-    renderOverallCoverage() {
-        return (0, html_builder_1.table)(this.tableHeader(), (0, html_builder_1.tbody)(this.coverageRow(this.reporter.overallReport)));
+    renderReports(reports) {
+        let reportRender = '';
+        for (let i = 0; i < reports.length; i++) {
+            const report = reports[i];
+            reportRender += (0, html_builder_1.fragment)(this.renderOverallCoverage(report, 'Report'), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
+        }
+        return reportRender;
     }
-    renderFilesCoverage() {
-        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader(), (0, html_builder_1.tbody)(...this.reporter.filesReport.map(fileReport => this.coverageRow(fileReport)))));
+    renderOverallCoverage(report, firstTh) {
+        return (0, html_builder_1.table)(this.tableHeader(firstTh), (0, html_builder_1.tbody)(this.renderCoverageRow(report.overallReport)));
     }
-    tableHeader() {
-        return (0, html_builder_1.tr)((0, html_builder_1.thead)((0, html_builder_1.td)(), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches')));
+    renderFilesCoverage(report) {
+        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File Coverage'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
     }
-    coverageRow(file) {
+    tableHeader(firstTh = '') {
+        return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches')));
+    }
+    renderCoverageRow(file) {
         var _a, _b, _c, _d, _e, _f;
         const prefix = (_a = process.env.GITHUB_WORKSPACE) === null || _a === void 0 ? void 0 : _a.replace(/\\/g, '/');
         const relative = prefix && ((_b = file.file) === null || _b === void 0 ? void 0 : _b.replace(prefix, ''));
         const href = `https://github.com/${this.repository}/blob/${this.commit}/${relative}`;
         const title = file.file
             ? (0, html_builder_1.a)({ href }, (file === null || file === void 0 ? void 0 : file.title) || ``)
-            : (0, html_builder_1.p)((file === null || file === void 0 ? void 0 : file.title) || '');
+            : (0, html_builder_1.a)((file === null || file === void 0 ? void 0 : file.title) || '');
         return !file
             ? ''
             : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = file.statements) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = file.lines) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = file.functions) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = file.branches) === null || _f === void 0 ? void 0 : _f.percentage}%`));
+    }
+    renderGlobalReport(globalReport) {
+        return (0, html_builder_1.fragment)((0, html_builder_1.table)(this.renderOverallCoverage(globalReport, 'Global')), (0, html_builder_1.hr)());
     }
 }
 exports.Renderer = Renderer;
@@ -69431,8 +69501,9 @@ module.exports = require("zlib");
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.customTag = exports.li = exports.ol = exports.ul = exports.th = exports.td = exports.tr = exports.tfoot = exports.tbody = exports.thead = exports.table = exports.summary = exports.details = exports.h6 = exports.h5 = exports.h4 = exports.h3 = exports.h2 = exports.h1 = exports.span = exports.div = exports.i = exports.b = exports.p = exports.a = exports.fragment = exports.tag = void 0;
-function tag(name) {
+exports.track = exports.source = exports.param = exports.meta = exports.link = exports.input = exports.img = exports.hr = exports.embed = exports.col = exports.br = exports.base = exports.area = exports.summary = exports.details = exports.dd = exports.dt = exports.li = exports.ol = exports.ul = exports.caption = exports.colgroup = exports.th = exports.td = exports.tr = exports.tfoot = exports.tbody = exports.thead = exports.table = exports.span = exports.div = exports.code = exports.pre = exports.em = exports.strong = exports.q = exports.i = exports.b = exports.p = exports.h6 = exports.h5 = exports.h4 = exports.h3 = exports.h2 = exports.h1 = exports.a = exports.title = exports.style = exports.fragment = exports.tag = void 0;
+exports.customTag = exports.wbr = void 0;
+function tag(name, selfClosing = false) {
     return (...children) => {
         let props = '';
         const firstChild = children[0];
@@ -69442,7 +69513,9 @@ function tag(name) {
                 .join('');
         }
         const content = typeof firstChild === 'string' ? children : children.slice(1);
-        return `<${name}${props}>${content.join('')}</${name}>`;
+        return selfClosing
+            ? `<${name}${props} />`
+            : `<${name}${props}>${content.join('')}</${name}>`;
     };
 }
 exports.tag = tag;
@@ -69450,20 +69523,25 @@ function fragment(...children) {
     return children.join('');
 }
 exports.fragment = fragment;
+exports.style = tag('style');
+exports.title = tag('title');
 exports.a = tag('a');
-exports.p = tag('p');
-exports.b = tag('b');
-exports.i = tag('i');
-exports.div = tag('div');
-exports.span = tag('span');
 exports.h1 = tag('h1');
 exports.h2 = tag('h2');
 exports.h3 = tag('h3');
 exports.h4 = tag('h4');
 exports.h5 = tag('h5');
 exports.h6 = tag('h6');
-exports.details = tag('details');
-exports.summary = tag('summary');
+exports.p = tag('p');
+exports.b = tag('b');
+exports.i = tag('i');
+exports.q = tag('q');
+exports.strong = tag('strong');
+exports.em = tag('em');
+exports.pre = tag('pre');
+exports.code = tag('code');
+exports.div = tag('div');
+exports.span = tag('span');
 exports.table = tag('table');
 exports.thead = tag('thead');
 exports.tbody = tag('tbody');
@@ -69471,9 +69549,29 @@ exports.tfoot = tag('tfoot');
 exports.tr = tag('tr');
 exports.td = tag('td');
 exports.th = tag('th');
+exports.colgroup = tag('colgroup');
+exports.caption = tag('caption');
 exports.ul = tag('ul');
 exports.ol = tag('ol');
 exports.li = tag('li');
+exports.dt = tag('dt');
+exports.dd = tag('dd');
+exports.details = tag('details');
+exports.summary = tag('summary');
+exports.area = tag('area', true);
+exports.base = tag('base', true);
+exports.br = tag('br', true);
+exports.col = tag('col', true);
+exports.embed = tag('embed', true);
+exports.hr = tag('hr', true);
+exports.img = tag('img', true);
+exports.input = tag('input', true);
+exports.link = tag('link', true);
+exports.meta = tag('meta', true);
+exports.param = tag('param', true);
+exports.source = tag('source', true);
+exports.track = tag('track', true);
+exports.wbr = tag('wbr', true);
 const customTag = (name, ...children) => {
     return tag(name)(...children);
 };

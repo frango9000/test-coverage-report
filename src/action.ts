@@ -1,12 +1,12 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {Annotation, CheckResponse, Inputs, IssueComment} from './interface'
-import {div, p} from '@frango9000/html-builder'
 import {getInputAsArray, getInputAsBoolean} from './utils'
 import {Context} from '@actions/github/lib/context'
 import {CoverageReport} from './coverage-report'
 import {GitHub} from '@actions/github/lib/utils'
 import {Renderer} from './renderer'
+import {p} from '@frango9000/html-builder'
 
 export class Action {
   readonly token = core.getInput(Inputs.TOKEN, {required: true})
@@ -38,11 +38,24 @@ export class Action {
 
     const check = await this.postRunCheck()
 
-    const message = await this.getAggregatedReports()
+    const generatedReports = await CoverageReport.generateFileReports(
+      this.coverageFiles,
+      this.coverageTypes
+    )
 
-    await this.postComment(message)
+    const globalReport: CoverageReport | null =
+      CoverageReport.generateGlobalReport(generatedReports)
 
-    await this.updateRunCheck(check.id, 'success', message)
+    const render = new Renderer(
+      this.context.repo.repo,
+      this.context.payload.after,
+      generatedReports,
+      globalReport
+    ).render()
+
+    await this.postComment(render)
+
+    await this.updateRunCheck(check.id, 'success', render)
   }
 
   async postComment(message: string): Promise<void> {
@@ -109,7 +122,7 @@ export class Action {
     const resp = await this.octokit.rest.repos.createCommitComment({
       ...this.context.repo,
       commit_sha: this.context.sha,
-      body: message
+      body: this.getMessageHeader() + message
     })
     core.debug(`Check run create response: ${resp.status}`)
     core.debug(`Comment URL: ${resp.data.url}`)
@@ -126,14 +139,14 @@ export class Action {
         response = await this.octokit.rest.issues.createComment({
           ...this.context.repo,
           issue_number: this.context.payload.pull_request.number,
-          body: this.getHtmlTitle() + message
+          body: this.getMessageHeader() + message
         })
       } else {
         core.debug(`Previous comment found, updating...`)
         response = await this.octokit.rest.issues.updateComment({
           ...this.context.repo,
           comment_id: previousComments[0].id,
-          body: this.getHtmlTitle() + message + this.getUpdateFooter()
+          body: this.getMessageHeader() + message + this.getUpdateFooter()
         })
       }
 
@@ -157,10 +170,6 @@ export class Action {
     }
   }
 
-  private getUpdateFooter(): string {
-    return `<p>Last Update @ ${new Date().toUTCString()}<p>`
-  }
-
   private async listPreviousComments(): Promise<IssueComment[]> {
     const per_page = 20
     let results: IssueComment[] = []
@@ -179,11 +188,11 @@ export class Action {
       } while (response.data.length === per_page)
     }
     return results.filter(comment =>
-      comment.body?.includes(this.getHtmlTitle())
+      comment.body?.includes(this.getMessageHeader())
     )
   }
 
-  private getHtmlTitle(): string {
+  private getMessageHeader(): string {
     return p(
       {'data-id': this.context.payload.pull_request?.id},
       this.getTitle()
@@ -191,27 +200,11 @@ export class Action {
   }
 
   private getTitle(): string {
-    const customTitle = this.title ? ` | ${this.title}` : ''
-    return `Test Coverage Report${customTitle}`
+    const customTitle = this.title ? `${this.title} | ` : ''
+    return `${customTitle}Coverage Report`
   }
 
-  private async getAggregatedReports(): Promise<string> {
-    let aggregatedReport = ''
-
-    for (let i = 0; i < this.coverageFiles.length; i++) {
-      const reporter = await new CoverageReport(
-        this.coverageFiles[i],
-        this.coverageTypes[i] || null
-      ).init()
-
-      const renderer = new Renderer(
-        reporter,
-        this.context.repo.repo,
-        this.context.payload.after
-      )
-
-      aggregatedReport += div(renderer.renderCoverage())
-    }
-    return aggregatedReport
+  private getUpdateFooter(): string {
+    return p(`Last Update @ ${new Date().toUTCString()}`)
   }
 }

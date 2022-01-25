@@ -1,3 +1,4 @@
+import * as core from '@actions/core'
 import {
   FileCoverageReport,
   FileCoverageSummary,
@@ -43,16 +44,28 @@ export class CoverageReport {
     return this._filesReport
   }
 
+  set filesReport(value: FileCoverageReport[]) {
+    this._filesReport = value
+  }
+
   async init(): Promise<CoverageReport> {
     this._filesReport = await coverageParser.parseFile(this.path, {
       type: this.type
     })
+    this.enhanceFileReports()
+    this.generateOverallReport()
+    return this
+  }
+
+  enhanceFileReports(): void {
     for (const fileCoverageReport of this._filesReport) {
       this.enhanceCoverageReport(fileCoverageReport)
     }
+  }
+
+  generateOverallReport(): void {
     this._overallReport = this.measureOverallReport(this._filesReport)
     this.enhanceCoverageReport(this._overallReport)
-    return this
   }
 
   private enhanceCoverageReport(fileCoverageReport: FileCoverageReport): void {
@@ -72,6 +85,11 @@ export class CoverageReport {
     fileCoverageReport.functions.percentage = this.measurePercentage(
       fileCoverageReport.functions
     )
+    fileCoverageReport.file = fileCoverageReport.file?.replace(/\\/g, '/')
+    if (!fileCoverageReport.title) {
+      fileCoverageReport.title =
+        fileCoverageReport.file?.split('/').pop() || 'No Filename'
+    }
   }
 
   private getStatement(fileReport: FileCoverageReport): FileCoverageSummary {
@@ -127,8 +145,39 @@ export class CoverageReport {
         branches: {hit: 0, found: 0}
       }
     )
-    overallCoverageReport.title = 'Overall Coverage'
+    core.debug(this.path)
+    overallCoverageReport.title = this.path.split('/').pop()
     overallCoverageReport.statements = this.getStatement(overallCoverageReport)
     return overallCoverageReport
+  }
+
+  static async generateFileReports(
+    files: string[],
+    types?: string[]
+  ): Promise<CoverageReport[]> {
+    const coverageReports: CoverageReport[] = []
+    for (let i = 0; i < files.length; i++) {
+      const coverageReport = await new CoverageReport(
+        files[i],
+        (types && types[i]) || null
+      ).init()
+      coverageReports.push(coverageReport)
+    }
+    return coverageReports
+  }
+
+  static generateGlobalReport(
+    generatedReports: CoverageReport[]
+  ): CoverageReport | null {
+    if (generatedReports.length > 1) {
+      const globalReport = new CoverageReport('', 'global')
+      globalReport.filesReport = generatedReports.map(
+        reports => reports.overallReport
+      )
+      globalReport.generateOverallReport()
+      globalReport.overallReport.title = 'Global Report'
+      return globalReport
+    }
+    return null
   }
 }
