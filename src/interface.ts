@@ -65,7 +65,7 @@ export enum Inputs {
   TITLE = 'title',
 
   DISABLE_COMMENT = 'disable-comment',
-  DISABLE_BUILD_FAIL = 'disable-build-fail',
+  ENABLE_BUILD_FAIL = 'enable-build-fail',
 
   REPORT_FILES = 'report-files',
   REPORT_TYPES = 'report-types',
@@ -88,4 +88,11 @@ export interface CoverageRequirements {
 export interface CoverageRequirement {
   error: number
   warn: number
+}
+
+export interface UnmetRequirement {
+  title?: string
+  file?: string
+  requirement: number
+  coverage: number
 }

@@ -38,10 +38,10 @@ class Action {
     constructor() {
         this.token = core.getInput(interface_1.Inputs.TOKEN, { required: true });
         this.title = core.getInput(interface_1.Inputs.TITLE);
-        this.disableComment = (0, utils_1.getInputAsBoolean)(interface_1.Inputs.DISABLE_COMMENT, {
+        this.commentDisabled = (0, utils_1.getInputAsBoolean)(interface_1.Inputs.DISABLE_COMMENT, {
             required: true
         });
-        this.disableBuildFail = (0, utils_1.getInputAsBoolean)(interface_1.Inputs.DISABLE_BUILD_FAIL, {
+        this.buildFailEnabled = (0, utils_1.getInputAsBoolean)(interface_1.Inputs.ENABLE_BUILD_FAIL, {
             required: true
         });
         this.reportFiles = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_FILES, {
@@ -51,16 +51,16 @@ class Action {
         this.reportTitles = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_TITLES) || [];
         this.minCoverage = {
             file: {
-                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_ERROR_MIN),
-                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_WARN_MIN)
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_ERROR_MIN) || 0,
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_WARN_MIN) || 0
             },
             report: {
-                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_ERROR_MIN),
-                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_WARN_MIN)
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_ERROR_MIN) || 0,
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_WARN_MIN) || 0
             },
             global: {
-                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_ERROR_MIN),
-                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_WARN_MIN)
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_ERROR_MIN) || 0,
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_WARN_MIN) || 0
             }
         };
         this.octokit = github.getOctokit(this.token);
@@ -68,17 +68,23 @@ class Action {
         core.debug(JSON.stringify(this.context));
     }
     async run() {
-        if (!this.reportFiles && !this.disableBuildFail)
+        if (!this.reportFiles && this.buildFailEnabled) {
             core.setFailed('No Coverage Files Found');
+        }
         const check = await this.postRunCheck();
         const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.reportFiles, this.reportTypes, this.reportTitles);
         const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
         const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
         await this.postComment(render);
-        await this.updateRunCheck(check.id, 'success', render);
+        const unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
+        const conclusion = !unmetRequirements ? 'success' : 'failure';
+        await this.updateRunCheck(check.id, conclusion, render);
+        if (unmetRequirements && this.buildFailEnabled) {
+            core.setFailed(JSON.stringify({ unmetRequirements }));
+        }
     }
     async postComment(message) {
-        if (!this.disableComment) {
+        if (!this.commentDisabled) {
             if (this.context.eventName === 'pull_request') {
                 await this.postPullRequestComment(message);
             }
@@ -209,32 +215,12 @@ exports.Action = Action;
 /***/ }),
 
 /***/ 3963:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CoverageReport = void 0;
-const core = __importStar(__nccwpck_require__(2186));
 const interface_1 = __nccwpck_require__(8201);
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
 const coverageParser = __nccwpck_require__(2879);
@@ -344,7 +330,6 @@ class CoverageReport {
             lines: { hit: 0, found: 0 },
             branches: { hit: 0, found: 0 }
         });
-        core.debug(this.path);
         overallCoverageReport.title = this.path.split('/').pop();
         overallCoverageReport.statements = this.getStatement(overallCoverageReport);
         return overallCoverageReport;
@@ -366,6 +351,42 @@ class CoverageReport {
             return globalReport;
         }
         return null;
+    }
+    static getUnmetRequirements(generatedReports, globalReport, minCoverage) {
+        var _a, _b, _c, _d, _e, _f;
+        const unmetRequirements = [];
+        if (globalReport &&
+            minCoverage.global.error >
+                (((_a = globalReport.overallReport.statements) === null || _a === void 0 ? void 0 : _a.percentage) || 0)) {
+            unmetRequirements.push({
+                coverage: ((_b = globalReport.overallReport.statements) === null || _b === void 0 ? void 0 : _b.percentage) || 0,
+                file: 'Global Coverage',
+                requirement: minCoverage.file.error,
+                title: 'Global Coverage'
+            });
+        }
+        for (const report of generatedReports) {
+            if (minCoverage.report.error >
+                (((_c = report.overallReport.statements) === null || _c === void 0 ? void 0 : _c.percentage) || 0)) {
+                unmetRequirements.push({
+                    coverage: ((_d = report.overallReport.statements) === null || _d === void 0 ? void 0 : _d.percentage) || 0,
+                    file: report.overallReport.file,
+                    requirement: minCoverage.report.error,
+                    title: `Report: ${report.overallReport.file}`
+                });
+            }
+            for (const fileReport of report.filesReport) {
+                if (minCoverage.file.error > (((_e = fileReport.statements) === null || _e === void 0 ? void 0 : _e.percentage) || 0)) {
+                    unmetRequirements.push({
+                        coverage: ((_f = fileReport.statements) === null || _f === void 0 ? void 0 : _f.percentage) || 0,
+                        file: fileReport.file,
+                        requirement: minCoverage.file.error,
+                        title: fileReport.title
+                    });
+                }
+            }
+        }
+        return unmetRequirements;
     }
 }
 exports.CoverageReport = CoverageReport;
@@ -399,7 +420,7 @@ var Inputs;
     Inputs["TOKEN"] = "token";
     Inputs["TITLE"] = "title";
     Inputs["DISABLE_COMMENT"] = "disable-comment";
-    Inputs["DISABLE_BUILD_FAIL"] = "disable-build-fail";
+    Inputs["ENABLE_BUILD_FAIL"] = "enable-build-fail";
     Inputs["REPORT_FILES"] = "report-files";
     Inputs["REPORT_TYPES"] = "report-types";
     Inputs["REPORT_TITLES"] = "report-titles";

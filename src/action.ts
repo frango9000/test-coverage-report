@@ -5,7 +5,8 @@ import {
   CheckResponse,
   CoverageRequirements,
   Inputs,
-  IssueComment
+  IssueComment,
+  UnmetRequirement
 } from './interface'
 import {getInputAsArray, getInputAsBoolean, getInputAsNumber} from './utils'
 import {Context} from '@actions/github/lib/context'
@@ -20,10 +21,10 @@ export class Action {
 
   readonly token = core.getInput(Inputs.TOKEN, {required: true})
   readonly title = core.getInput(Inputs.TITLE)
-  readonly disableComment = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
+  readonly commentDisabled = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
     required: true
   })
-  readonly disableBuildFail = getInputAsBoolean(Inputs.DISABLE_BUILD_FAIL, {
+  readonly buildFailEnabled = getInputAsBoolean(Inputs.ENABLE_BUILD_FAIL, {
     required: true
   })
   readonly reportFiles: string[] = getInputAsArray(Inputs.REPORT_FILES, {
@@ -34,16 +35,16 @@ export class Action {
 
   readonly minCoverage: CoverageRequirements = {
     file: {
-      error: getInputAsNumber(Inputs.FILE_COVERAGE_ERROR_MIN),
-      warn: getInputAsNumber(Inputs.FILE_COVERAGE_WARN_MIN)
+      error: getInputAsNumber(Inputs.FILE_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.FILE_COVERAGE_WARN_MIN) || 0
     },
     report: {
-      error: getInputAsNumber(Inputs.REPORT_COVERAGE_ERROR_MIN),
-      warn: getInputAsNumber(Inputs.REPORT_COVERAGE_WARN_MIN)
+      error: getInputAsNumber(Inputs.REPORT_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.REPORT_COVERAGE_WARN_MIN) || 0
     },
     global: {
-      error: getInputAsNumber(Inputs.GLOBAL_COVERAGE_ERROR_MIN),
-      warn: getInputAsNumber(Inputs.GLOBAL_COVERAGE_WARN_MIN)
+      error: getInputAsNumber(Inputs.GLOBAL_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.GLOBAL_COVERAGE_WARN_MIN) || 0
     }
   }
 
@@ -55,8 +56,9 @@ export class Action {
   }
 
   async run(): Promise<void> {
-    if (!this.reportFiles && !this.disableBuildFail)
+    if (!this.reportFiles && this.buildFailEnabled) {
       core.setFailed('No Coverage Files Found')
+    }
 
     const check = await this.postRunCheck()
 
@@ -79,11 +81,24 @@ export class Action {
 
     await this.postComment(render)
 
-    await this.updateRunCheck(check.id, 'success', render)
+    const unmetRequirements: UnmetRequirement[] =
+      CoverageReport.getUnmetRequirements(
+        generatedReports,
+        globalReport,
+        this.minCoverage
+      )
+
+    const conclusion = !unmetRequirements ? 'success' : 'failure'
+
+    await this.updateRunCheck(check.id, conclusion, render)
+
+    if (unmetRequirements && this.buildFailEnabled) {
+      core.setFailed(JSON.stringify({unmetRequirements}))
+    }
   }
 
   async postComment(message: string): Promise<void> {
-    if (!this.disableComment) {
+    if (!this.commentDisabled) {
       if (this.context.eventName === 'pull_request') {
         await this.postPullRequestComment(message)
       } else if (this.context.eventName === 'push') {

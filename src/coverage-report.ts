@@ -1,10 +1,11 @@
-import * as core from '@actions/core'
 import {
+  CoverageRequirements,
   FileCoverageReport,
   FileCoverageSummary,
   ReportExtension,
   ReportType,
-  SupportedReports
+  SupportedReports,
+  UnmetRequirement
 } from './interface'
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
 const coverageParser = require('@connectis/coverage-parser')
@@ -146,7 +147,6 @@ export class CoverageReport {
         branches: {hit: 0, found: 0}
       }
     )
-    core.debug(this.path)
     overallCoverageReport.title = this.path.split('/').pop()
     overallCoverageReport.statements = this.getStatement(overallCoverageReport)
     return overallCoverageReport
@@ -182,5 +182,49 @@ export class CoverageReport {
       return globalReport
     }
     return null
+  }
+
+  static getUnmetRequirements(
+    generatedReports: CoverageReport[],
+    globalReport: CoverageReport | null,
+    minCoverage: CoverageRequirements
+  ): UnmetRequirement[] {
+    const unmetRequirements: UnmetRequirement[] = []
+    if (
+      globalReport &&
+      minCoverage.global.error >
+        (globalReport.overallReport.statements?.percentage || 0)
+    ) {
+      unmetRequirements.push({
+        coverage: globalReport.overallReport.statements?.percentage || 0,
+        file: 'Global Coverage',
+        requirement: minCoverage.file.error,
+        title: 'Global Coverage'
+      })
+    }
+    for (const report of generatedReports) {
+      if (
+        minCoverage.report.error >
+        (report.overallReport.statements?.percentage || 0)
+      ) {
+        unmetRequirements.push({
+          coverage: report.overallReport.statements?.percentage || 0,
+          file: report.overallReport.file,
+          requirement: minCoverage.report.error,
+          title: `Report: ${report.overallReport.file}`
+        })
+      }
+      for (const fileReport of report.filesReport) {
+        if (minCoverage.file.error > (fileReport.statements?.percentage || 0)) {
+          unmetRequirements.push({
+            coverage: fileReport.statements?.percentage || 0,
+            file: fileReport.file,
+            requirement: minCoverage.file.error,
+            title: fileReport.title
+          })
+        }
+      }
+    }
+    return unmetRequirements
   }
 }
