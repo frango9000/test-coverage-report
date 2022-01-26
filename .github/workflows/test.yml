@@ -1,10 +1,7 @@
 name: 'build-test'
-on: # rebuild any PRs and main branch changes
+on:
   pull_request:
   push:
-    branches:
-      - main
-      - 'releases/*'
 
 jobs:
   build: # make sure build/ci work properly
@@ -48,3 +45,6 @@ jobs:
           report-types: |
             jacoco
             lcov
+          report-titles: |
+            Backend Coverage
+            Frontend Coverage
