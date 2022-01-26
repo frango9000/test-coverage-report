@@ -478,7 +478,7 @@ class Renderer {
         return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
     }
     tableHeader(firstTh = '') {
-        return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches')));
+        return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches'), (0, html_builder_1.th)('Statements')));
     }
     renderCoverageRow(fileReport) {
         var _a, _b, _c, _d, _e, _f;
@@ -490,7 +490,7 @@ class Renderer {
             : (0, html_builder_1.a)((fileReport === null || fileReport === void 0 ? void 0 : fileReport.title) || '');
         return !fileReport
             ? ''
-            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = fileReport.statements) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = fileReport.lines) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = fileReport.functions) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = fileReport.branches) === null || _f === void 0 ? void 0 : _f.percentage}%`));
+            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = fileReport.lines) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = fileReport.functions) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = fileReport.branches) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = fileReport.statements) === null || _f === void 0 ? void 0 : _f.percentage}%`));
     }
     renderGlobalReport(globalReport) {
         return (0, html_builder_1.fragment)((0, html_builder_1.table)(this.renderOverallCoverage(globalReport, 'Global')), (0, html_builder_1.hr)());

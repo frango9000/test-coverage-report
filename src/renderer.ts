@@ -81,10 +81,10 @@ export class Renderer {
     return thead(
       tr(
         th(firstTh),
-        th('Statements'),
         th('Lines'),
         th('Functions'),
-        th('Branches')
+        th('Branches'),
+        th('Statements')
       )
     )
   }
@@ -103,10 +103,10 @@ export class Renderer {
       ? ''
       : tr(
           td(title),
-          td(`${fileReport.statements?.percentage}%`),
           td(`${fileReport.lines?.percentage}%`),
           td(`${fileReport.functions?.percentage}%`),
-          td(`${fileReport.branches?.percentage}%`)
+          td(`${fileReport.branches?.percentage}%`),
+          td(`${fileReport.statements?.percentage}%`)
         )
   }
 
