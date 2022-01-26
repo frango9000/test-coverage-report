@@ -120,7 +120,7 @@ export class CoverageReport {
   private measureOverallReport(
     items?: FileCoverageReport[]
   ): FileCoverageReport {
-    const overallCoverageReport = (items || []).reduce(
+    const overallCoverageReport: FileCoverageReport = (items || []).reduce(
       (accumulator, current) => {
         if (!current) {
           return accumulator

@@ -49,6 +49,20 @@ class Action {
         });
         this.reportTypes = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_TYPES) || [];
         this.reportTitles = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_TITLES) || [];
+        this.minCoverage = {
+            file: {
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_ERROR_MIN),
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.FILE_COVERAGE_WARN_MIN)
+            },
+            report: {
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_ERROR_MIN),
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.REPORT_COVERAGE_WARN_MIN)
+            },
+            global: {
+                error: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_ERROR_MIN),
+                warn: (0, utils_1.getInputAsNumber)(interface_1.Inputs.GLOBAL_COVERAGE_WARN_MIN)
+            }
+        };
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
         core.debug(JSON.stringify(this.context));
@@ -59,7 +73,7 @@ class Action {
         const check = await this.postRunCheck();
         const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.reportFiles, this.reportTypes, this.reportTitles);
         const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
-        const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport).render();
+        const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
         await this.postComment(render);
         await this.updateRunCheck(check.id, 'success', render);
     }
@@ -389,6 +403,12 @@ var Inputs;
     Inputs["REPORT_FILES"] = "report-files";
     Inputs["REPORT_TYPES"] = "report-types";
     Inputs["REPORT_TITLES"] = "report-titles";
+    Inputs["FILE_COVERAGE_ERROR_MIN"] = "file-coverage-error-min";
+    Inputs["FILE_COVERAGE_WARN_MIN"] = "file-coverage-warn-min";
+    Inputs["REPORT_COVERAGE_ERROR_MIN"] = "report-coverage-error-min";
+    Inputs["REPORT_COVERAGE_WARN_MIN"] = "report-coverage-warn-min";
+    Inputs["GLOBAL_COVERAGE_ERROR_MIN"] = "global-coverage-error-min";
+    Inputs["GLOBAL_COVERAGE_WARN_MIN"] = "global-coverage-warn-min";
 })(Inputs = exports.Inputs || (exports.Inputs = {}));
 
 
@@ -446,11 +466,12 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Renderer = void 0;
 const html_builder_1 = __nccwpck_require__(2002);
 class Renderer {
-    constructor(repository, commit, reports, globalReport) {
-        this.repository = repository;
+    constructor(repo, commit, reports, globalReport, minCoverage) {
+        this.repo = repo;
         this.commit = commit;
         this.reports = reports;
         this.globalReport = globalReport;
+        this.minCoverage = minCoverage;
     }
     render() {
         var _a;
@@ -467,33 +488,42 @@ class Renderer {
         let reportRender = '';
         for (let i = 0; i < reports.length; i++) {
             const report = reports[i];
-            reportRender += (0, html_builder_1.fragment)(report.title ? (0, html_builder_1.fragment)((0, html_builder_1.p)(), (0, html_builder_1.p)(report.title), (0, html_builder_1.p)()) : (0, html_builder_1.p)(), this.renderOverallCoverage(report, 'Report'), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
+            reportRender += (0, html_builder_1.fragment)(report.title ? (0, html_builder_1.fragment)((0, html_builder_1.p)(), (0, html_builder_1.p)(report.title), (0, html_builder_1.p)()) : (0, html_builder_1.p)(), this.renderOverallCoverage(report, 'Report', this.minCoverage.report), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
         }
         return reportRender;
     }
-    renderOverallCoverage(report, firstTh) {
-        return (0, html_builder_1.table)(this.tableHeader(firstTh), (0, html_builder_1.tbody)(this.renderCoverageRow(report.overallReport)));
+    renderGlobalReport(globalReport) {
+        return (0, html_builder_1.fragment)((0, html_builder_1.table)(this.renderOverallCoverage(globalReport, 'Global', this.minCoverage.global)), (0, html_builder_1.hr)());
+    }
+    renderOverallCoverage(report, firstTh, requirements) {
+        return (0, html_builder_1.table)(this.tableHeader(firstTh), (0, html_builder_1.tbody)(this.renderCoverageRow(report.overallReport, requirements)));
     }
     renderFilesCoverage(report) {
-        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
+        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport, this.minCoverage.file)))));
     }
-    tableHeader(firstTh = '') {
-        return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches'), (0, html_builder_1.th)('Statements')));
-    }
-    renderCoverageRow(fileReport) {
-        var _a, _b, _c, _d, _e, _f;
+    renderCoverageRow(fileReport, requirements) {
+        var _a, _b, _c, _d;
         const prefix = (_a = process.env.GITHUB_WORKSPACE) === null || _a === void 0 ? void 0 : _a.replace(/\\/g, '/');
         const relative = prefix && ((_b = fileReport.file) === null || _b === void 0 ? void 0 : _b.replace(prefix, ''));
-        const href = `https://github.com/${this.repository.owner}/${this.repository.repo}/blob/${this.commit}/${relative || fileReport.file}`;
+        const href = `https://github.com/${this.repo.owner}/${this.repo.repo}/blob/${this.commit}/${relative || fileReport.file}`;
         const title = fileReport.file
             ? (0, html_builder_1.a)({ href }, (fileReport === null || fileReport === void 0 ? void 0 : fileReport.title) || ``)
             : (0, html_builder_1.a)((fileReport === null || fileReport === void 0 ? void 0 : fileReport.title) || '');
         return !fileReport
             ? ''
-            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = fileReport.lines) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = fileReport.functions) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = fileReport.branches) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = fileReport.statements) === null || _f === void 0 ? void 0 : _f.percentage}%`));
+            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${fileReport.lines.percentage}%`), (0, html_builder_1.td)(`${fileReport.functions.percentage}%`), (0, html_builder_1.td)(`${fileReport.branches.percentage}%`), (0, html_builder_1.td)(`${(_c = fileReport.statements) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(this.getThresholdIcon((_d = fileReport.statements) === null || _d === void 0 ? void 0 : _d.percentage, requirements)));
     }
-    renderGlobalReport(globalReport) {
-        return (0, html_builder_1.fragment)((0, html_builder_1.table)(this.renderOverallCoverage(globalReport, 'Global')), (0, html_builder_1.hr)());
+    tableHeader(firstTh = '') {
+        return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches'), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)()));
+    }
+    getThresholdIcon(percentage, requirements) {
+        if (requirements.error && requirements.error > (percentage || 0)) {
+            return '❌️';
+        }
+        if (requirements.warn && requirements.warn > (percentage || 0)) {
+            return '⚠️';
+        }
+        return '✔️';
     }
 }
 exports.Renderer = Renderer;
@@ -526,7 +556,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getInputAsBoolean = exports.getInputAsArray = void 0;
+exports.getInputAsNumber = exports.getInputAsBoolean = exports.getInputAsArray = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 function getInputAsArray(name, options) {
     return core
@@ -540,6 +570,10 @@ function getInputAsBoolean(name, options) {
     return core.getInput(name, options).toLowerCase() === 'true';
 }
 exports.getInputAsBoolean = getInputAsBoolean;
+function getInputAsNumber(name, options) {
+    return Number.parseFloat(core.getInput(name, options));
+}
+exports.getInputAsNumber = getInputAsNumber;
 
 
 /***/ }),

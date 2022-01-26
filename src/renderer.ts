@@ -1,4 +1,9 @@
 import {
+  CoverageRequirement,
+  CoverageRequirements,
+  FileCoverageReport
+} from './interface'
+import {
   a,
   details,
   fragment,
@@ -14,14 +19,14 @@ import {
   tr
 } from '@frango9000/html-builder'
 import {CoverageReport} from './coverage-report'
-import {FileCoverageReport} from './interface'
 
 export class Renderer {
   constructor(
-    private readonly repository: {owner: string; repo: string},
+    private readonly repo: {owner: string; repo: string},
     private readonly commit: string,
     private readonly reports: CoverageReport[],
-    private readonly globalReport?: CoverageReport | null
+    private readonly globalReport: CoverageReport | null,
+    private readonly minCoverage: CoverageRequirements
   ) {}
 
   render(): string {
@@ -45,7 +50,7 @@ export class Renderer {
       const report = reports[i]
       reportRender += fragment(
         report.title ? fragment(p(), p(report.title), p()) : p(),
-        this.renderOverallCoverage(report, 'Report'),
+        this.renderOverallCoverage(report, 'Report', this.minCoverage.report),
         this.renderFilesCoverage(report),
         i !== reports.length - 1 ? hr() : ''
       )
@@ -53,13 +58,27 @@ export class Renderer {
     return reportRender
   }
 
+  private renderGlobalReport(globalReport: CoverageReport): string {
+    return fragment(
+      table(
+        this.renderOverallCoverage(
+          globalReport,
+          'Global',
+          this.minCoverage.global
+        )
+      ),
+      hr()
+    )
+  }
+
   private renderOverallCoverage(
     report: CoverageReport,
-    firstTh: string
+    firstTh: string,
+    requirements: CoverageRequirement
   ): string {
     return table(
       this.tableHeader(firstTh),
-      tbody(this.renderCoverageRow(report.overallReport))
+      tbody(this.renderCoverageRow(report.overallReport, requirements))
     )
   }
 
@@ -70,30 +89,21 @@ export class Renderer {
         this.tableHeader('File'),
         tbody(
           ...report.filesReport.map(fileReport =>
-            this.renderCoverageRow(fileReport)
+            this.renderCoverageRow(fileReport, this.minCoverage.file)
           )
         )
       )
     )
   }
 
-  private tableHeader(firstTh = ''): string {
-    return thead(
-      tr(
-        th(firstTh),
-        th('Lines'),
-        th('Functions'),
-        th('Branches'),
-        th('Statements')
-      )
-    )
-  }
-
-  private renderCoverageRow(fileReport: FileCoverageReport): string {
+  private renderCoverageRow(
+    fileReport: FileCoverageReport,
+    requirements: CoverageRequirement
+  ): string {
     const prefix = process.env.GITHUB_WORKSPACE?.replace(/\\/g, '/')
     const relative = prefix && fileReport.file?.replace(prefix, '')
-    const href = `https://github.com/${this.repository.owner}/${
-      this.repository.repo
+    const href = `https://github.com/${this.repo.owner}/${
+      this.repo.repo
     }/blob/${this.commit}/${relative || fileReport.file}`
 
     const title = fileReport.file
@@ -103,17 +113,42 @@ export class Renderer {
       ? ''
       : tr(
           td(title),
-          td(`${fileReport.lines?.percentage}%`),
-          td(`${fileReport.functions?.percentage}%`),
-          td(`${fileReport.branches?.percentage}%`),
-          td(`${fileReport.statements?.percentage}%`)
+          td(`${fileReport.lines.percentage}%`),
+          td(`${fileReport.functions.percentage}%`),
+          td(`${fileReport.branches.percentage}%`),
+          td(`${fileReport.statements?.percentage}%`),
+          td(
+            this.getThresholdIcon(
+              fileReport.statements?.percentage,
+              requirements
+            )
+          )
         )
   }
 
-  private renderGlobalReport(globalReport: CoverageReport): string {
-    return fragment(
-      table(this.renderOverallCoverage(globalReport, 'Global')),
-      hr()
+  private tableHeader(firstTh = ''): string {
+    return thead(
+      tr(
+        th(firstTh),
+        th('Lines'),
+        th('Functions'),
+        th('Branches'),
+        th('Statements'),
+        th()
+      )
     )
+  }
+
+  private getThresholdIcon(
+    percentage: number | undefined,
+    requirements: CoverageRequirement
+  ): string {
+    if (requirements.error && requirements.error > (percentage || 0)) {
+      return '❌️'
+    }
+    if (requirements.warn && requirements.warn > (percentage || 0)) {
+      return '⚠️'
+    }
+    return '✔️'
   }
 }

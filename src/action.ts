@@ -1,7 +1,13 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {Annotation, CheckResponse, Inputs, IssueComment} from './interface'
-import {getInputAsArray, getInputAsBoolean} from './utils'
+import {
+  Annotation,
+  CheckResponse,
+  CoverageRequirements,
+  Inputs,
+  IssueComment
+} from './interface'
+import {getInputAsArray, getInputAsBoolean, getInputAsNumber} from './utils'
 import {Context} from '@actions/github/lib/context'
 import {CoverageReport} from './coverage-report'
 import {GitHub} from '@actions/github/lib/utils'
@@ -9,6 +15,9 @@ import {Renderer} from './renderer'
 import {p} from '@frango9000/html-builder'
 
 export class Action {
+  readonly octokit: InstanceType<typeof GitHub>
+  readonly context: Context
+
   readonly token = core.getInput(Inputs.TOKEN, {required: true})
   readonly title = core.getInput(Inputs.TITLE)
   readonly disableComment = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
@@ -22,8 +31,21 @@ export class Action {
   })
   readonly reportTypes: string[] = getInputAsArray(Inputs.REPORT_TYPES) || []
   readonly reportTitles: string[] = getInputAsArray(Inputs.REPORT_TITLES) || []
-  readonly octokit: InstanceType<typeof GitHub>
-  readonly context: Context
+
+  readonly minCoverage: CoverageRequirements = {
+    file: {
+      error: getInputAsNumber(Inputs.FILE_COVERAGE_ERROR_MIN),
+      warn: getInputAsNumber(Inputs.FILE_COVERAGE_WARN_MIN)
+    },
+    report: {
+      error: getInputAsNumber(Inputs.REPORT_COVERAGE_ERROR_MIN),
+      warn: getInputAsNumber(Inputs.REPORT_COVERAGE_WARN_MIN)
+    },
+    global: {
+      error: getInputAsNumber(Inputs.GLOBAL_COVERAGE_ERROR_MIN),
+      warn: getInputAsNumber(Inputs.GLOBAL_COVERAGE_WARN_MIN)
+    }
+  }
 
   constructor() {
     this.octokit = github.getOctokit(this.token)
@@ -51,7 +73,8 @@ export class Action {
       this.context.repo,
       this.context.payload.after,
       generatedReports,
-      globalReport
+      globalReport,
+      this.minCoverage
     ).render()
 
     await this.postComment(render)

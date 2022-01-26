@@ -29,12 +29,20 @@ jobs:
           title: 'Jacoco Fixture Coverage'
           report-files: |
             ./__tests__/__fixtures__/jacoco.xml
+          file-coverage-error-min: 60
+          file-coverage-warn-min: 80
+          report-coverage-error-min: 50
+          report-coverage-warn-min: 70
 
       - uses: ./
         with:
           title: 'Lcov Fixture Coverage'
           report-files: |
             ./__tests__/__fixtures__/lcov.info
+          file-coverage-error-min: 60
+          file-coverage-warn-min: 80
+          report-coverage-error-min: 50
+          report-coverage-warn-min: 70
 
       - uses: ./
         with:
@@ -48,3 +56,9 @@ jobs:
           report-titles: |
             Backend Coverage
             Frontend Coverage
+          file-coverage-error-min: 60
+          file-coverage-warn-min: 80
+          report-coverage-error-min: 50
+          report-coverage-warn-min: 70
+          global-coverage-error-min: 40
+          global-coverage-warn-min: 60
