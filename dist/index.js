@@ -65,7 +65,6 @@ class Action {
         };
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
-        core.debug(JSON.stringify(this.context));
     }
     async run() {
         if (!this.reportFiles && this.buildFailEnabled) {
@@ -77,9 +76,10 @@ class Action {
         const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
         await this.postComment(render);
         const unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
-        const conclusion = !unmetRequirements ? 'success' : 'failure';
+        const conclusion = !unmetRequirements.length ? 'success' : 'failure';
         await this.updateRunCheck(check.id, conclusion, render);
-        if (unmetRequirements && this.buildFailEnabled) {
+        core.debug(JSON.stringify(unmetRequirements));
+        if (unmetRequirements.length && this.buildFailEnabled) {
             core.setFailed(JSON.stringify({ unmetRequirements }));
         }
     }
@@ -123,8 +123,8 @@ class Action {
             },
             ...github.context.repo
         });
-        core.debug(`Check run URL: ${resp.data.url}`);
-        core.debug(`Check run HTML: ${resp.data.html_url}`);
+        core.debug(`Update Check run URL: ${resp.data.url}`);
+        core.debug(`Update Check run HTML: ${resp.data.html_url}`);
         return resp.data;
     }
     async postCommitComment(message) {
@@ -133,7 +133,6 @@ class Action {
             commit_sha: this.context.sha,
             body: this.getMessageHeader() + message
         });
-        core.debug(`Check run create response: ${resp.status}`);
         core.debug(`Comment URL: ${resp.data.url}`);
         core.debug(`Comment HTML: ${resp.data.html_url}`);
     }
