@@ -19,7 +19,7 @@ jobs:
       - uses: ./
         with:
           title: 'Source Code Coverage'
-          coverage-files: |
+          report-files: |
             ./coverage/lcov.info
 
   test: # make sure the action works on a clean machine without building
@@ -30,21 +30,21 @@ jobs:
       - uses: ./
         with:
           title: 'Jacoco Fixture Coverage'
-          coverage-files: |
+          report-files: |
             ./__tests__/__fixtures__/jacoco.xml
 
       - uses: ./
         with:
           title: 'Lcov Fixture Coverage'
-          coverage-files: |
+          report-files: |
             ./__tests__/__fixtures__/lcov.info
 
       - uses: ./
         with:
-          title: 'Multi Fixture Coverage'
-          coverage-files: |
+          title: 'Multi Fixture'
+          report-files: |
             ./__tests__/__fixtures__/jacoco.xml
             ./__tests__/__fixtures__/lcov.info
-          coverage-types: |
+          report-types: |
             jacoco
             lcov

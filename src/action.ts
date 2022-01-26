@@ -17,11 +17,11 @@ export class Action {
   readonly disableBuildFail = getInputAsBoolean(Inputs.DISABLE_BUILD_FAIL, {
     required: true
   })
-  readonly coverageFiles: string[] = getInputAsArray(Inputs.COVERAGE_FILES, {
+  readonly reportFiles: string[] = getInputAsArray(Inputs.REPORT_FILES, {
     required: true
   })
-  readonly coverageTypes: string[] =
-    getInputAsArray(Inputs.COVERAGE_TYPES) || []
+  readonly reportTypes: string[] = getInputAsArray(Inputs.REPORT_TYPES) || []
+  readonly reportTitles: string[] = getInputAsArray(Inputs.REPORT_TITLES) || []
   readonly octokit: InstanceType<typeof GitHub>
   readonly context: Context
 
@@ -33,21 +33,22 @@ export class Action {
   }
 
   async run(): Promise<void> {
-    if (!this.coverageFiles && !this.disableBuildFail)
+    if (!this.reportFiles && !this.disableBuildFail)
       core.setFailed('No Coverage Files Found')
 
     const check = await this.postRunCheck()
 
     const generatedReports = await CoverageReport.generateFileReports(
-      this.coverageFiles,
-      this.coverageTypes
+      this.reportFiles,
+      this.reportTypes,
+      this.reportTitles
     )
 
     const globalReport: CoverageReport | null =
       CoverageReport.generateGlobalReport(generatedReports)
 
     const render = new Renderer(
-      this.context.repo.repo,
+      this.context.repo,
       this.context.payload.after,
       generatedReports,
       globalReport

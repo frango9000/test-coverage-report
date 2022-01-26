@@ -17,11 +17,14 @@ inputs:
     required: false
     description: 'Disable failing the build if no coverage files found'
     default: 'false'
-  coverage-files:
+  report-files:
     description: 'A list of coverage files'
     required: true
-  coverage-types:
+  report-types:
     description: 'A list of coverage types in the same order as the required list of files'
+    required: false
+  report-titles:
+    description: 'A list of titles for each report in the same order as the required list of files'
     required: false
 runs:
   using: 'node12'

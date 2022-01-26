@@ -44,21 +44,22 @@ class Action {
         this.disableBuildFail = (0, utils_1.getInputAsBoolean)(interface_1.Inputs.DISABLE_BUILD_FAIL, {
             required: true
         });
-        this.coverageFiles = (0, utils_1.getInputAsArray)(interface_1.Inputs.COVERAGE_FILES, {
+        this.reportFiles = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_FILES, {
             required: true
         });
-        this.coverageTypes = (0, utils_1.getInputAsArray)(interface_1.Inputs.COVERAGE_TYPES) || [];
+        this.reportTypes = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_TYPES) || [];
+        this.reportTitles = (0, utils_1.getInputAsArray)(interface_1.Inputs.REPORT_TITLES) || [];
         this.octokit = github.getOctokit(this.token);
         this.context = github.context;
         core.debug(JSON.stringify(this.context));
     }
     async run() {
-        if (!this.coverageFiles && !this.disableBuildFail)
+        if (!this.reportFiles && !this.disableBuildFail)
             core.setFailed('No Coverage Files Found');
         const check = await this.postRunCheck();
-        const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.coverageFiles, this.coverageTypes);
+        const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.reportFiles, this.reportTypes, this.reportTitles);
         const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
-        const render = new renderer_1.Renderer(this.context.repo.repo, this.context.payload.after, generatedReports, globalReport).render();
+        const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport).render();
         await this.postComment(render);
         await this.updateRunCheck(check.id, 'success', render);
     }
@@ -224,9 +225,10 @@ const interface_1 = __nccwpck_require__(8201);
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
 const coverageParser = __nccwpck_require__(2879);
 class CoverageReport {
-    constructor(path, type) {
+    constructor(path, type, title) {
         this.path = path;
         this.type = type;
+        this.title = title;
         this._filesReport = [];
         if (!this.type) {
             const extension = path.split('.').pop();
@@ -333,10 +335,10 @@ class CoverageReport {
         overallCoverageReport.statements = this.getStatement(overallCoverageReport);
         return overallCoverageReport;
     }
-    static async generateFileReports(files, types) {
+    static async generateFileReports(files, types, titles) {
         const coverageReports = [];
         for (let i = 0; i < files.length; i++) {
-            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null).init();
+            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null, (titles && titles[i]) || null).init();
             coverageReports.push(coverageReport);
         }
         return coverageReports;
@@ -346,7 +348,7 @@ class CoverageReport {
             const globalReport = new CoverageReport('', 'global');
             globalReport.filesReport = generatedReports.map(reports => reports.overallReport);
             globalReport.generateOverallReport();
-            globalReport.overallReport.title = 'Global Report';
+            globalReport.overallReport.title = 'Coverage';
             return globalReport;
         }
         return null;
@@ -384,8 +386,9 @@ var Inputs;
     Inputs["TITLE"] = "title";
     Inputs["DISABLE_COMMENT"] = "disable-comment";
     Inputs["DISABLE_BUILD_FAIL"] = "disable-build-fail";
-    Inputs["COVERAGE_FILES"] = "coverage-files";
-    Inputs["COVERAGE_TYPES"] = "coverage-types";
+    Inputs["REPORT_FILES"] = "report-files";
+    Inputs["REPORT_TYPES"] = "report-types";
+    Inputs["REPORT_TITLES"] = "report-titles";
 })(Inputs = exports.Inputs || (exports.Inputs = {}));
 
 
@@ -472,22 +475,22 @@ class Renderer {
         return (0, html_builder_1.table)(this.tableHeader(firstTh), (0, html_builder_1.tbody)(this.renderCoverageRow(report.overallReport)));
     }
     renderFilesCoverage(report) {
-        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File Coverage'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
+        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), report.title ? (0, html_builder_1.fragment)((0, html_builder_1.p)(), (0, html_builder_1.p)(report.title), (0, html_builder_1.p)()) : (0, html_builder_1.p)(), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
     }
     tableHeader(firstTh = '') {
         return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches')));
     }
-    renderCoverageRow(file) {
+    renderCoverageRow(fileReport) {
         var _a, _b, _c, _d, _e, _f;
         const prefix = (_a = process.env.GITHUB_WORKSPACE) === null || _a === void 0 ? void 0 : _a.replace(/\\/g, '/');
-        const relative = prefix && ((_b = file.file) === null || _b === void 0 ? void 0 : _b.replace(prefix, ''));
-        const href = `https://github.com/${this.repository}/blob/${this.commit}/${relative}`;
-        const title = file.file
-            ? (0, html_builder_1.a)({ href }, (file === null || file === void 0 ? void 0 : file.title) || ``)
-            : (0, html_builder_1.a)((file === null || file === void 0 ? void 0 : file.title) || '');
-        return !file
+        const relative = prefix && ((_b = fileReport.file) === null || _b === void 0 ? void 0 : _b.replace(prefix, ''));
+        const href = `https://github.com/${this.repository.owner}/${this.repository.repo}/blob/${this.commit}/${relative || fileReport.file}`;
+        const title = fileReport.file
+            ? (0, html_builder_1.a)({ href }, (fileReport === null || fileReport === void 0 ? void 0 : fileReport.title) || ``)
+            : (0, html_builder_1.a)((fileReport === null || fileReport === void 0 ? void 0 : fileReport.title) || '');
+        return !fileReport
             ? ''
-            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = file.statements) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = file.lines) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = file.functions) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = file.branches) === null || _f === void 0 ? void 0 : _f.percentage}%`));
+            : (0, html_builder_1.tr)((0, html_builder_1.td)(title), (0, html_builder_1.td)(`${(_c = fileReport.statements) === null || _c === void 0 ? void 0 : _c.percentage}%`), (0, html_builder_1.td)(`${(_d = fileReport.lines) === null || _d === void 0 ? void 0 : _d.percentage}%`), (0, html_builder_1.td)(`${(_e = fileReport.functions) === null || _e === void 0 ? void 0 : _e.percentage}%`), (0, html_builder_1.td)(`${(_f = fileReport.branches) === null || _f === void 0 ? void 0 : _f.percentage}%`));
     }
     renderGlobalReport(globalReport) {
         return (0, html_builder_1.fragment)((0, html_builder_1.table)(this.renderOverallCoverage(globalReport, 'Global')), (0, html_builder_1.hr)());

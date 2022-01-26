@@ -65,6 +65,7 @@ export enum Inputs {
   TITLE = 'title',
   DISABLE_COMMENT = 'disable-comment',
   DISABLE_BUILD_FAIL = 'disable-build-fail',
-  COVERAGE_FILES = 'coverage-files',
-  COVERAGE_TYPES = 'coverage-types'
+  REPORT_FILES = 'report-files',
+  REPORT_TYPES = 'report-types',
+  REPORT_TITLES = 'report-titles'
 }

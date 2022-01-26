@@ -15,7 +15,8 @@ export class CoverageReport {
 
   constructor(
     private readonly path: string,
-    private type?: ReportType | string | null
+    private type?: ReportType | string | null,
+    public title?: string | null
   ) {
     if (!this.type) {
       const extension = path.split('.').pop()
@@ -153,13 +154,15 @@ export class CoverageReport {
 
   static async generateFileReports(
     files: string[],
-    types?: string[]
+    types?: string[],
+    titles?: string[]
   ): Promise<CoverageReport[]> {
     const coverageReports: CoverageReport[] = []
     for (let i = 0; i < files.length; i++) {
       const coverageReport = await new CoverageReport(
         files[i],
-        (types && types[i]) || null
+        (types && types[i]) || null,
+        (titles && titles[i]) || null
       ).init()
       coverageReports.push(coverageReport)
     }
@@ -175,7 +178,7 @@ export class CoverageReport {
         reports => reports.overallReport
       )
       globalReport.generateOverallReport()
-      globalReport.overallReport.title = 'Global Report'
+      globalReport.overallReport.title = 'Coverage'
       return globalReport
     }
     return null

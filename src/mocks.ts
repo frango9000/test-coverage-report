@@ -84,7 +84,7 @@ export const mockGlobalReport = {
   functions: {hit: 27, found: 33, percentage: 81.82},
   lines: {hit: 79, found: 87, percentage: 90.8},
   branches: {hit: 42, found: 60, percentage: 70},
-  title: 'Global Report',
+  title: 'Coverage',
   statements: {hit: 148, found: 180, percentage: 82.22},
   file: undefined
 }

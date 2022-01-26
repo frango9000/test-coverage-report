@@ -3,6 +3,7 @@ import {
   details,
   fragment,
   hr,
+  p,
   span,
   summary,
   table,
@@ -17,7 +18,7 @@ import {FileCoverageReport} from './interface'
 
 export class Renderer {
   constructor(
-    private readonly repository: string,
+    private readonly repository: {owner: string; repo: string},
     private readonly commit: string,
     private readonly reports: CoverageReport[],
     private readonly globalReport?: CoverageReport | null
@@ -64,8 +65,9 @@ export class Renderer {
   private renderFilesCoverage(report: CoverageReport): string {
     return details(
       summary('Expand Report'),
+      report.title ? fragment(p(), p(report.title), p()) : p(),
       table(
-        this.tableHeader('File Coverage'),
+        this.tableHeader('File'),
         tbody(
           ...report.filesReport.map(fileReport =>
             this.renderCoverageRow(fileReport)
@@ -87,22 +89,24 @@ export class Renderer {
     )
   }
 
-  private renderCoverageRow(file: FileCoverageReport): string {
+  private renderCoverageRow(fileReport: FileCoverageReport): string {
     const prefix = process.env.GITHUB_WORKSPACE?.replace(/\\/g, '/')
-    const relative = prefix && file.file?.replace(prefix, '')
-    const href = `https://github.com/${this.repository}/blob/${this.commit}/${relative}`
+    const relative = prefix && fileReport.file?.replace(prefix, '')
+    const href = `https://github.com/${this.repository.owner}/${
+      this.repository.repo
+    }/blob/${this.commit}/${relative || fileReport.file}`
 
-    const title = file.file
-      ? a({href}, file?.title || ``)
-      : a(file?.title || '')
-    return !file
+    const title = fileReport.file
+      ? a({href}, fileReport?.title || ``)
+      : a(fileReport?.title || '')
+    return !fileReport
       ? ''
       : tr(
           td(title),
-          td(`${file.statements?.percentage}%`),
-          td(`${file.lines?.percentage}%`),
-          td(`${file.functions?.percentage}%`),
-          td(`${file.branches?.percentage}%`)
+          td(`${fileReport.statements?.percentage}%`),
+          td(`${fileReport.lines?.percentage}%`),
+          td(`${fileReport.functions?.percentage}%`),
+          td(`${fileReport.branches?.percentage}%`)
         )
   }
 
