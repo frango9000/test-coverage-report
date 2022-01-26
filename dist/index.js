@@ -76,9 +76,12 @@ class Action {
         const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
         await this.postComment(render);
         const unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
-        const conclusion = !unmetRequirements.length ? 'success' : 'failure';
-        await this.updateRunCheck(check.id, conclusion, render);
         core.debug(JSON.stringify(unmetRequirements));
+        let conclusion = 'success';
+        if (unmetRequirements.length && this.buildFailEnabled) {
+            conclusion = 'failure';
+        }
+        await this.updateRunCheck(check.id, conclusion, render);
         if (unmetRequirements.length && this.buildFailEnabled) {
             core.setFailed(JSON.stringify({ unmetRequirements }));
         }

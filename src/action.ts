@@ -85,12 +85,16 @@ export class Action {
         globalReport,
         this.minCoverage
       )
+    core.debug(JSON.stringify(unmetRequirements))
 
-    const conclusion = !unmetRequirements.length ? 'success' : 'failure'
+    let conclusion: 'success' | 'failure' = 'success'
+
+    if (unmetRequirements.length && this.buildFailEnabled) {
+      conclusion = 'failure'
+    }
 
     await this.updateRunCheck(check.id, conclusion, render)
 
-    core.debug(JSON.stringify(unmetRequirements))
     if (unmetRequirements.length && this.buildFailEnabled) {
       core.setFailed(JSON.stringify({unmetRequirements}))
     }
