@@ -467,7 +467,7 @@ class Renderer {
         let reportRender = '';
         for (let i = 0; i < reports.length; i++) {
             const report = reports[i];
-            reportRender += (0, html_builder_1.fragment)(this.renderOverallCoverage(report, 'Report'), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
+            reportRender += (0, html_builder_1.fragment)(report.title ? (0, html_builder_1.fragment)((0, html_builder_1.p)(), (0, html_builder_1.p)(report.title), (0, html_builder_1.p)()) : (0, html_builder_1.p)(), this.renderOverallCoverage(report, 'Report'), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
         }
         return reportRender;
     }
@@ -475,7 +475,7 @@ class Renderer {
         return (0, html_builder_1.table)(this.tableHeader(firstTh), (0, html_builder_1.tbody)(this.renderCoverageRow(report.overallReport)));
     }
     renderFilesCoverage(report) {
-        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), report.title ? (0, html_builder_1.fragment)((0, html_builder_1.p)(), (0, html_builder_1.p)(report.title), (0, html_builder_1.p)()) : (0, html_builder_1.p)(), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
+        return (0, html_builder_1.details)((0, html_builder_1.summary)('Expand Report'), (0, html_builder_1.table)(this.tableHeader('File'), (0, html_builder_1.tbody)(...report.filesReport.map(fileReport => this.renderCoverageRow(fileReport)))));
     }
     tableHeader(firstTh = '') {
         return (0, html_builder_1.thead)((0, html_builder_1.tr)((0, html_builder_1.th)(firstTh), (0, html_builder_1.th)('Statements'), (0, html_builder_1.th)('Lines'), (0, html_builder_1.th)('Functions'), (0, html_builder_1.th)('Branches')));

@@ -44,6 +44,7 @@ export class Renderer {
     for (let i = 0; i < reports.length; i++) {
       const report = reports[i]
       reportRender += fragment(
+        report.title ? fragment(p(), p(report.title), p()) : p(),
         this.renderOverallCoverage(report, 'Report'),
         this.renderFilesCoverage(report),
         i !== reports.length - 1 ? hr() : ''
@@ -65,7 +66,6 @@ export class Renderer {
   private renderFilesCoverage(report: CoverageReport): string {
     return details(
       summary('Expand Report'),
-      report.title ? fragment(p(), p(report.title), p()) : p(),
       table(
         this.tableHeader('File'),
         tbody(
