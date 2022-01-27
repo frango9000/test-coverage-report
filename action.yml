@@ -13,10 +13,6 @@ inputs:
     required: false
     description: 'Disable comment post/update'
     default: 'false'
-  disable-build-fail:
-    required: false
-    description: 'Disable failing the build if no coverage files found'
-    default: 'false'
   report-files:
     description: 'A list of coverage files'
     required: true
@@ -25,6 +21,28 @@ inputs:
     required: false
   report-titles:
     description: 'A list of titles for each report in the same order as the required list of files'
+    required: false
+  enable-build-fail:
+    required: false
+    description: 'Enable failing the build if coverage requirements are not met or no coverage files found'
+    default: 'false'
+  file-coverage-error-min:
+    description: 'Minimal coverage required per file. Will fail if any file coverage is below this'
+    required: false
+  file-coverage-warn-min:
+    description: 'Minimal coverage recommended per file. Will warn if any file coverage is below this'
+    required: false
+  report-coverage-error-min:
+    description: 'Minimal coverage required per report. Will fail if any report coverage is below this'
+    required: false
+  report-coverage-warn-min:
+    description: 'Minimal coverage recommended per report. Will warn if any report coverage is below this'
+    required: false
+  global-coverage-error-min:
+    description: 'Minimal global coverage required. Will fail if multiple reports received and threshold not met. Ignored if only one report file received'
+    required: false
+  global-coverage-warn-min:
+    description: 'Minimal global coverage required recommended. Will warn if multiple reports received and threshold not met. Ignored if only one report file received'
     required: false
 runs:
   using: 'node12'

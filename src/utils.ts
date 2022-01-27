@@ -17,3 +17,10 @@ export function getInputAsBoolean(
 ): boolean {
   return core.getInput(name, options).toLowerCase() === 'true'
 }
+
+export function getInputAsNumber(
+  name: string,
+  options?: core.InputOptions
+): number {
+  return Number.parseFloat(core.getInput(name, options))
+}

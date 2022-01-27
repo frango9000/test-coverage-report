@@ -1,7 +1,14 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {Annotation, CheckResponse, Inputs, IssueComment} from './interface'
-import {getInputAsArray, getInputAsBoolean} from './utils'
+import {
+  Annotation,
+  CheckResponse,
+  CoverageRequirements,
+  Inputs,
+  IssueComment,
+  UnmetRequirement
+} from './interface'
+import {getInputAsArray, getInputAsBoolean, getInputAsNumber} from './utils'
 import {Context} from '@actions/github/lib/context'
 import {CoverageReport} from './coverage-report'
 import {GitHub} from '@actions/github/lib/utils'
@@ -9,12 +16,15 @@ import {Renderer} from './renderer'
 import {p} from '@frango9000/html-builder'
 
 export class Action {
+  readonly octokit: InstanceType<typeof GitHub>
+  readonly context: Context
+
   readonly token = core.getInput(Inputs.TOKEN, {required: true})
   readonly title = core.getInput(Inputs.TITLE)
-  readonly disableComment = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
+  readonly commentDisabled = getInputAsBoolean(Inputs.DISABLE_COMMENT, {
     required: true
   })
-  readonly disableBuildFail = getInputAsBoolean(Inputs.DISABLE_BUILD_FAIL, {
+  readonly buildFailEnabled = getInputAsBoolean(Inputs.ENABLE_BUILD_FAIL, {
     required: true
   })
   readonly reportFiles: string[] = getInputAsArray(Inputs.REPORT_FILES, {
@@ -22,19 +32,31 @@ export class Action {
   })
   readonly reportTypes: string[] = getInputAsArray(Inputs.REPORT_TYPES) || []
   readonly reportTitles: string[] = getInputAsArray(Inputs.REPORT_TITLES) || []
-  readonly octokit: InstanceType<typeof GitHub>
-  readonly context: Context
+
+  readonly minCoverage: CoverageRequirements = {
+    file: {
+      error: getInputAsNumber(Inputs.FILE_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.FILE_COVERAGE_WARN_MIN) || 0
+    },
+    report: {
+      error: getInputAsNumber(Inputs.REPORT_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.REPORT_COVERAGE_WARN_MIN) || 0
+    },
+    global: {
+      error: getInputAsNumber(Inputs.GLOBAL_COVERAGE_ERROR_MIN) || 0,
+      warn: getInputAsNumber(Inputs.GLOBAL_COVERAGE_WARN_MIN) || 0
+    }
+  }
 
   constructor() {
     this.octokit = github.getOctokit(this.token)
     this.context = github.context
-
-    core.debug(JSON.stringify(this.context))
   }
 
   async run(): Promise<void> {
-    if (!this.reportFiles && !this.disableBuildFail)
+    if (!this.reportFiles && this.buildFailEnabled) {
       core.setFailed('No Coverage Files Found')
+    }
 
     const check = await this.postRunCheck()
 
@@ -51,16 +73,35 @@ export class Action {
       this.context.repo,
       this.context.payload.after,
       generatedReports,
-      globalReport
+      globalReport,
+      this.minCoverage
     ).render()
 
     await this.postComment(render)
 
-    await this.updateRunCheck(check.id, 'success', render)
+    const unmetRequirements: UnmetRequirement[] =
+      CoverageReport.getUnmetRequirements(
+        generatedReports,
+        globalReport,
+        this.minCoverage
+      )
+    core.debug(JSON.stringify(unmetRequirements))
+
+    let conclusion: 'success' | 'failure' = 'success'
+
+    if (unmetRequirements.length && this.buildFailEnabled) {
+      conclusion = 'failure'
+    }
+
+    await this.updateRunCheck(check.id, conclusion, render)
+
+    if (unmetRequirements.length && this.buildFailEnabled) {
+      core.setFailed(JSON.stringify({unmetRequirements}))
+    }
   }
 
   async postComment(message: string): Promise<void> {
-    if (!this.disableComment) {
+    if (!this.commentDisabled) {
       if (this.context.eventName === 'pull_request') {
         await this.postPullRequestComment(message)
       } else if (this.context.eventName === 'push') {
@@ -114,8 +155,8 @@ export class Action {
       ...github.context.repo
     })
 
-    core.debug(`Check run URL: ${resp.data.url}`)
-    core.debug(`Check run HTML: ${resp.data.html_url}`)
+    core.debug(`Update Check run URL: ${resp.data.url}`)
+    core.debug(`Update Check run HTML: ${resp.data.html_url}`)
     return resp.data
   }
 
@@ -125,7 +166,6 @@ export class Action {
       commit_sha: this.context.sha,
       body: this.getMessageHeader() + message
     })
-    core.debug(`Check run create response: ${resp.status}`)
     core.debug(`Comment URL: ${resp.data.url}`)
     core.debug(`Comment HTML: ${resp.data.html_url}`)
   }

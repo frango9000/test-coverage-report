@@ -63,9 +63,36 @@ export interface FileCoverageReport {
 export enum Inputs {
   TOKEN = 'token',
   TITLE = 'title',
+
   DISABLE_COMMENT = 'disable-comment',
-  DISABLE_BUILD_FAIL = 'disable-build-fail',
+  ENABLE_BUILD_FAIL = 'enable-build-fail',
+
   REPORT_FILES = 'report-files',
   REPORT_TYPES = 'report-types',
-  REPORT_TITLES = 'report-titles'
+  REPORT_TITLES = 'report-titles',
+
+  FILE_COVERAGE_ERROR_MIN = 'file-coverage-error-min',
+  FILE_COVERAGE_WARN_MIN = 'file-coverage-warn-min',
+  REPORT_COVERAGE_ERROR_MIN = 'report-coverage-error-min',
+  REPORT_COVERAGE_WARN_MIN = 'report-coverage-warn-min',
+  GLOBAL_COVERAGE_ERROR_MIN = 'global-coverage-error-min',
+  GLOBAL_COVERAGE_WARN_MIN = 'global-coverage-warn-min'
+}
+
+export interface CoverageRequirements {
+  file: CoverageRequirement
+  report: CoverageRequirement
+  global: CoverageRequirement
+}
+
+export interface CoverageRequirement {
+  error: number
+  warn: number
+}
+
+export interface UnmetRequirement {
+  title?: string
+  file?: string
+  requirement: number
+  coverage: number
 }
