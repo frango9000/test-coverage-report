@@ -88,7 +88,6 @@ export class Action {
         globalReport,
         this.minCoverage
       )
-      core.debug(JSON.stringify(unmetRequirements))
 
       if (unmetRequirements.length && this.buildFailEnabled) {
         conclusion = 'failure'
@@ -98,7 +97,16 @@ export class Action {
         conclusion = 'failure'
       }
     } finally {
-      await this.updateRunCheck(check.id, conclusion, render)
+      try {
+        await this.updateRunCheck(check.id, conclusion, render)
+      } catch (e) {
+        await this.updateRunCheck(
+          check.id,
+          conclusion,
+          'Report exceeded Github size limit. See logs for more info.'
+        )
+        core.info(render)
+      }
 
       if (unmetRequirements.length && this.buildFailEnabled) {
         core.setFailed(JSON.stringify({unmetRequirements}))
@@ -118,6 +126,7 @@ export class Action {
 
   async postRunCheck(): Promise<CheckResponse> {
     const name = this.getTitle()
+    core.debug('Setting check in progress.')
     const resp = await this.octokit.rest.checks.create({
       ...this.context.repo,
       head_sha: this.context.sha,
@@ -149,6 +158,7 @@ export class Action {
   ): Promise<CheckResponse> {
     const name = this.getTitle()
     const icon = conclusion === 'success' ? '✔' : '❌'
+    core.debug(`Updating Run Check: ${runId} ${icon}`)
     const resp = await this.octokit.rest.checks.update({
       check_run_id: runId,
       conclusion,
@@ -167,6 +177,7 @@ export class Action {
   }
 
   private async postCommitComment(message: string): Promise<void> {
+    core.debug(`Posting commit comment.`)
     const resp = await this.octokit.rest.repos.createCommitComment({
       ...this.context.repo,
       commit_sha: this.context.sha,
