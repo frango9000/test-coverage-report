@@ -6,7 +6,7 @@ async function run(): Promise<void> {
     const action = new Action()
     await action.run()
   } catch (error) {
-    core.debug(JSON.stringify(error))
+    core.debug(`${error}`)
     if (error instanceof Error) core.setFailed(error.message)
   }
 }

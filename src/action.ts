@@ -59,44 +59,50 @@ export class Action {
     }
 
     const check = await this.postRunCheck()
+    let render = ''
+    let conclusion: 'success' | 'failure' = 'success'
+    let unmetRequirements: UnmetRequirement[] = []
 
-    const generatedReports = await CoverageReport.generateFileReports(
-      this.reportFiles,
-      this.reportTypes,
-      this.reportTitles
-    )
+    try {
+      const generatedReports = await CoverageReport.generateFileReports(
+        this.reportFiles,
+        this.reportTypes,
+        this.reportTitles
+      )
 
-    const globalReport: CoverageReport | null =
-      CoverageReport.generateGlobalReport(generatedReports)
+      const globalReport: CoverageReport | null =
+        CoverageReport.generateGlobalReport(generatedReports)
 
-    const render = new Renderer(
-      this.context.repo,
-      this.context.payload.after,
-      generatedReports,
-      globalReport,
-      this.minCoverage
-    ).render()
+      render = new Renderer(
+        this.context.repo,
+        this.context.payload.after,
+        generatedReports,
+        globalReport,
+        this.minCoverage
+      ).render()
 
-    await this.postComment(render)
+      await this.postComment(render)
 
-    const unmetRequirements: UnmetRequirement[] =
-      CoverageReport.getUnmetRequirements(
+      unmetRequirements = CoverageReport.getUnmetRequirements(
         generatedReports,
         globalReport,
         this.minCoverage
       )
-    core.debug(JSON.stringify(unmetRequirements))
+      core.debug(JSON.stringify(unmetRequirements))
 
-    let conclusion: 'success' | 'failure' = 'success'
+      if (unmetRequirements.length && this.buildFailEnabled) {
+        conclusion = 'failure'
+      }
+    } catch (e) {
+      if (this.buildFailEnabled) {
+        conclusion = 'failure'
+      }
+    } finally {
+      await this.updateRunCheck(check.id, conclusion, render)
 
-    if (unmetRequirements.length && this.buildFailEnabled) {
-      conclusion = 'failure'
-    }
-
-    await this.updateRunCheck(check.id, conclusion, render)
-
-    if (unmetRequirements.length && this.buildFailEnabled) {
-      core.setFailed(JSON.stringify({unmetRequirements}))
+      if (unmetRequirements.length && this.buildFailEnabled) {
+        core.setFailed(JSON.stringify({unmetRequirements}))
+      }
     }
   }
 

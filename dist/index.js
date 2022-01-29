@@ -71,19 +71,30 @@ class Action {
             core.setFailed('No Coverage Files Found');
         }
         const check = await this.postRunCheck();
-        const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.reportFiles, this.reportTypes, this.reportTitles);
-        const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
-        const render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
-        await this.postComment(render);
-        const unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
-        core.debug(JSON.stringify(unmetRequirements));
+        let render = '';
         let conclusion = 'success';
-        if (unmetRequirements.length && this.buildFailEnabled) {
-            conclusion = 'failure';
+        let unmetRequirements = [];
+        try {
+            const generatedReports = await coverage_report_1.CoverageReport.generateFileReports(this.reportFiles, this.reportTypes, this.reportTitles);
+            const globalReport = coverage_report_1.CoverageReport.generateGlobalReport(generatedReports);
+            render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
+            await this.postComment(render);
+            unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
+            core.debug(JSON.stringify(unmetRequirements));
+            if (unmetRequirements.length && this.buildFailEnabled) {
+                conclusion = 'failure';
+            }
         }
-        await this.updateRunCheck(check.id, conclusion, render);
-        if (unmetRequirements.length && this.buildFailEnabled) {
-            core.setFailed(JSON.stringify({ unmetRequirements }));
+        catch (e) {
+            if (this.buildFailEnabled) {
+                conclusion = 'failure';
+            }
+        }
+        finally {
+            await this.updateRunCheck(check.id, conclusion, render);
+            if (unmetRequirements.length && this.buildFailEnabled) {
+                core.setFailed(JSON.stringify({ unmetRequirements }));
+            }
         }
     }
     async postComment(message) {
@@ -470,7 +481,7 @@ async function run() {
         await action.run();
     }
     catch (error) {
-        core.debug(JSON.stringify(error));
+        core.debug(`${error}`);
         if (error instanceof Error)
             core.setFailed(error.message);
     }
