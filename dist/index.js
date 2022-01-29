@@ -80,7 +80,6 @@ class Action {
             render = new renderer_1.Renderer(this.context.repo, this.context.payload.after, generatedReports, globalReport, this.minCoverage).render();
             await this.postComment(render);
             unmetRequirements = coverage_report_1.CoverageReport.getUnmetRequirements(generatedReports, globalReport, this.minCoverage);
-            core.debug(JSON.stringify(unmetRequirements));
             if (unmetRequirements.length && this.buildFailEnabled) {
                 conclusion = 'failure';
             }
@@ -91,7 +90,13 @@ class Action {
             }
         }
         finally {
-            await this.updateRunCheck(check.id, conclusion, render);
+            try {
+                await this.updateRunCheck(check.id, conclusion, render);
+            }
+            catch (e) {
+                await this.updateRunCheck(check.id, conclusion, 'Report exceeded Github size limit. See logs for more info.');
+                core.info(render);
+            }
             if (unmetRequirements.length && this.buildFailEnabled) {
                 core.setFailed(JSON.stringify({ unmetRequirements }));
             }
@@ -109,6 +114,7 @@ class Action {
     }
     async postRunCheck() {
         const name = this.getTitle();
+        core.debug('Setting check in progress.');
         const resp = await this.octokit.rest.checks.create({
             ...this.context.repo,
             head_sha: this.context.sha,
@@ -126,6 +132,7 @@ class Action {
     async updateRunCheck(runId, conclusion, summary, annotations = []) {
         const name = this.getTitle();
         const icon = conclusion === 'success' ? '✔' : '❌';
+        core.debug(`Updating Run Check: ${runId} ${icon}`);
         const resp = await this.octokit.rest.checks.update({
             check_run_id: runId,
             conclusion,
@@ -142,6 +149,7 @@ class Action {
         return resp.data;
     }
     async postCommitComment(message) {
+        core.debug(`Posting commit comment.`);
         const resp = await this.octokit.rest.repos.createCommitComment({
             ...this.context.repo,
             commit_sha: this.context.sha,
