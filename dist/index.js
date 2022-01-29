@@ -91,11 +91,15 @@ class Action {
         }
         finally {
             try {
+                if (this.getByteLength(render) > 62550) {
+                    render = render.replace(/<details><summary>Coverage Report<\/summary>.*<\/details>/g, '');
+                }
+                core.debug('Report exceeded Github size limit. Truncating it.');
                 await this.updateRunCheck(check.id, conclusion, render);
             }
             catch (e) {
-                await this.updateRunCheck(check.id, conclusion, 'Report exceeded Github size limit. See logs for more info.');
-                core.info(render);
+                core.debug('There was an error posting check conclusion.');
+                await this.updateRunCheck(check.id, conclusion, 'There was an error posting check conclusion. See logs for more info.');
             }
             if (unmetRequirements.length && this.buildFailEnabled) {
                 core.setFailed(JSON.stringify({ unmetRequirements }));
@@ -228,6 +232,9 @@ class Action {
     }
     getUpdateFooter() {
         return (0, html_builder_1.p)(`Last Update @ ${new Date().toUTCString()}`);
+    }
+    getByteLength(text) {
+        return Buffer.byteLength(text, 'utf8');
     }
 }
 exports.Action = Action;
@@ -490,8 +497,6 @@ async function run() {
     }
     catch (error) {
         core.debug(`${error}`);
-        if (error instanceof Error)
-            core.setFailed(error.message);
     }
 }
 run();

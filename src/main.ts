@@ -7,7 +7,6 @@ async function run(): Promise<void> {
     await action.run()
   } catch (error) {
     core.debug(`${error}`)
-    if (error instanceof Error) core.setFailed(error.message)
   }
 }
 
