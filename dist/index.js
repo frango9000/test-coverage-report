@@ -92,7 +92,7 @@ class Action {
         finally {
             try {
                 if (this.getByteLength(render) > 62550) {
-                    render = render.replace(/<details><summary>Coverage Report<\/summary>.*<\/details>/g, '');
+                    render = render.replace(/<details><summary>Expand Report<\/summary>(.+?)<\/details>/g, '');
                 }
                 core.debug('Report exceeded Github size limit. Truncating it.');
                 await this.updateRunCheck(check.id, conclusion, render);

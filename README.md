@@ -127,7 +127,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Frontend and Backend"
-          disable-comment: github.event_name == 'push'    # Only post on pull request, not on commit
+          disable-comment: ${{ github.event_name == 'push' }}    # Only post on pull request, not on commit
           report-files: |
             ./targer/target/site/jacoco-ut/jacoco.xml
             ./targer/target/site/jacoco-it/jacoco.xml

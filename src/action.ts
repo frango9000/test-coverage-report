@@ -100,7 +100,7 @@ export class Action {
       try {
         if (this.getByteLength(render) > 62550) {
           render = render.replace(
-            /<details><summary>Coverage Report<\/summary>.*<\/details>/g,
+            /<details><summary>Expand Report<\/summary>(.+?)<\/details>/g,
             ''
           )
         }
