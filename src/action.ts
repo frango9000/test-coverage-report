@@ -58,10 +58,14 @@ export class Action {
       core.setFailed('No Coverage Files Found')
     }
 
-    const check = await this.postRunCheck()
     let render = ''
+
+    let check
     let conclusion: 'success' | 'failure' = 'success'
     let unmetRequirements: UnmetRequirement[] = []
+    if (this.context.eventName === 'pull_request') {
+      check = await this.postRunCheck()
+    }
 
     try {
       const generatedReports = await CoverageReport.generateFileReports(
@@ -89,7 +93,7 @@ export class Action {
         this.minCoverage
       )
 
-      if (unmetRequirements.length && this.buildFailEnabled) {
+      if (this.buildFailEnabled && unmetRequirements.length) {
         conclusion = 'failure'
       }
     } catch (e) {
@@ -97,31 +101,17 @@ export class Action {
         conclusion = 'failure'
       }
     } finally {
-      try {
-        if (this.getByteLength(render) > 62550) {
-          render = render.replace(
-            /<details><summary>Expand Report<\/summary>(.+?)<\/details>/g,
-            ''
-          )
-        }
-        core.debug('Report exceeded Github size limit. Truncating it.')
-        await this.updateRunCheck(check.id, conclusion, render)
-      } catch (e) {
-        core.debug('There was an error posting check conclusion.')
-        await this.updateRunCheck(
-          check.id,
-          conclusion,
-          'There was an error posting check conclusion. See logs for more info.'
-        )
+      if (this.context.eventName === 'pull_request' && check?.id) {
+        this.concludeRunCheck(check.id, render, conclusion)
       }
 
-      if (unmetRequirements.length && this.buildFailEnabled) {
+      if (this.buildFailEnabled && unmetRequirements.length) {
         core.setFailed(JSON.stringify({unmetRequirements}))
       }
     }
   }
 
-  async postComment(message: string): Promise<void> {
+  private async postComment(message: string): Promise<void> {
     if (!this.commentDisabled) {
       if (this.context.eventName === 'pull_request') {
         await this.postPullRequestComment(message)
@@ -131,7 +121,33 @@ export class Action {
     }
   }
 
-  async postRunCheck(): Promise<CheckResponse> {
+  private async concludeRunCheck(
+    checkRunId: number,
+    render: string,
+    conclusion: 'success' | 'failure'
+  ): Promise<void> {
+    try {
+      if (this.getByteLength(render) > 60000) {
+        core.info(`Original Report:`)
+        core.info(render)
+        core.info('Report exceeded Github size limit. Truncating it.')
+        render = render.replace(
+          /<details><summary>Expand Report<\/summary>(.+?)<\/details>/g,
+          ''
+        )
+      }
+      await this.updateRunCheck(checkRunId, conclusion, render)
+    } catch (e) {
+      core.debug('There was an error posting check conclusion.')
+      await this.updateRunCheck(
+        checkRunId,
+        conclusion,
+        'There was an error posting check conclusion. See logs for more info.'
+      )
+    }
+  }
+
+  private async postRunCheck(): Promise<CheckResponse> {
     const name = this.getTitle()
     core.debug('Setting check in progress.')
     const resp = await this.octokit.rest.checks.create({
@@ -150,8 +166,8 @@ export class Action {
     return resp.data
   }
 
-  async updateRunCheck(
-    runId: number,
+  private async updateRunCheck(
+    checkRunId: number,
     conclusion:
       | 'action_required'
       | 'cancelled'
@@ -165,17 +181,17 @@ export class Action {
   ): Promise<CheckResponse> {
     const name = this.getTitle()
     const icon = conclusion === 'success' ? '✔' : '❌'
-    core.debug(`Updating Run Check: ${runId} ${icon}`)
+    core.debug(`Updating Run Check: ${checkRunId} ${icon}`)
     const resp = await this.octokit.rest.checks.update({
-      check_run_id: runId,
+      ...github.context.repo,
+      check_run_id: checkRunId,
       conclusion,
       status: 'completed',
       output: {
         title: `${name} ${icon}`,
         summary,
         annotations
-      },
-      ...github.context.repo
+      }
     })
 
     core.debug(`Update Check run URL: ${resp.data.url}`)
