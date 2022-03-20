@@ -1,3 +1,4 @@
+import * as core from '@actions/core'
 import {
   CoverageRequirements,
   FileCoverageReport,
@@ -56,6 +57,7 @@ export class CoverageReport {
     })
     this.enhanceFileReports()
     this.generateOverallReport()
+    core.info(`Report Generated for: ${this.path}`)
     return this
   }
 
@@ -159,12 +161,18 @@ export class CoverageReport {
   ): Promise<CoverageReport[]> {
     const coverageReports: CoverageReport[] = []
     for (let i = 0; i < files.length; i++) {
-      const coverageReport = await new CoverageReport(
-        files[i],
-        (types && types[i]) || null,
-        (titles && titles[i]) || files[i]
-      ).init()
-      coverageReports.push(coverageReport)
+      try {
+        const coverageReport = await new CoverageReport(
+          files[i],
+          (types && types[i]) || null,
+          (titles && titles[i]) || files[i]
+        ).init()
+        coverageReports.push(coverageReport)
+      } catch (e) {
+        core.info('Error Generating Report:')
+        core.info(`${files[i]}`)
+        core.info(`${e}`)
+      }
     }
     return coverageReports
   }
@@ -179,6 +187,7 @@ export class CoverageReport {
       )
       globalReport.generateOverallReport()
       globalReport.overallReport.title = 'Coverage'
+      core.info('Global Report Generated')
       return globalReport
     }
     return null

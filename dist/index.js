@@ -88,6 +88,7 @@ class Action {
             }
         }
         catch (e) {
+            core.info(`Something went wrong: ${e}`);
             if (this.buildFailEnabled) {
                 conclusion = 'failure';
             }
@@ -103,11 +104,16 @@ class Action {
     }
     async postComment(message) {
         if (!this.commentDisabled) {
-            if (this.context.eventName === 'pull_request') {
-                await this.postPullRequestComment(message);
+            try {
+                if (this.context.eventName === 'pull_request') {
+                    await this.postPullRequestComment(message);
+                }
+                else if (this.context.eventName === 'push') {
+                    await this.postCommitComment(message);
+                }
             }
-            else if (this.context.eventName === 'push') {
-                await this.postCommitComment(message);
+            catch (e) {
+                core.info(`Error posting comment: ${e}`);
             }
         }
     }
@@ -115,20 +121,19 @@ class Action {
         try {
             if (this.getByteLength(render) > 60000) {
                 core.info(`Original Report:`);
-                core.info(render);
                 core.info('Report exceeded Github size limit. Truncating it.');
                 render = render.replace(/<details><summary>Expand Report<\/summary>(.+?)<\/details>/g, '');
             }
             await this.updateRunCheck(checkRunId, conclusion, render);
         }
         catch (e) {
-            core.debug('There was an error posting check conclusion.');
+            core.info('There was an error posting check conclusion.');
             await this.updateRunCheck(checkRunId, conclusion, 'There was an error posting check conclusion. See logs for more info.');
         }
     }
     async postRunCheck() {
         const name = this.getTitle();
-        core.debug('Setting check in progress.');
+        core.info('Setting check in progress.');
         const resp = await this.octokit.rest.checks.create({
             ...this.context.repo,
             head_sha: this.context.sha,
@@ -139,14 +144,14 @@ class Action {
                 summary: 'In progress...'
             }
         });
-        core.debug(`Check run URL: ${resp.data.url}`);
-        core.debug(`Check run HTML: ${resp.data.html_url}`);
+        core.info(`Check run URL: ${resp.data.url}`);
+        core.info(`Check run HTML: ${resp.data.html_url}`);
         return resp.data;
     }
     async updateRunCheck(checkRunId, conclusion, summary, annotations = []) {
         const name = this.getTitle();
         const icon = conclusion === 'success' ? '✔' : '❌';
-        core.debug(`Updating Run Check: ${checkRunId} ${icon}`);
+        core.info(`Updating Run Check: ${checkRunId} ${icon}`);
         const resp = await this.octokit.rest.checks.update({
             ...github.context.repo,
             check_run_id: checkRunId,
@@ -158,19 +163,19 @@ class Action {
                 annotations
             }
         });
-        core.debug(`Update Check run URL: ${resp.data.url}`);
-        core.debug(`Update Check run HTML: ${resp.data.html_url}`);
+        core.info(`Update Check run URL: ${resp.data.url}`);
+        core.info(`Update Check run HTML: ${resp.data.html_url}`);
         return resp.data;
     }
     async postCommitComment(message) {
-        core.debug(`Posting commit comment.`);
+        core.info(`Posting commit comment.`);
         const resp = await this.octokit.rest.repos.createCommitComment({
             ...this.context.repo,
             commit_sha: this.context.sha,
             body: this.getMessageHeader() + message
         });
-        core.debug(`Comment URL: ${resp.data.url}`);
-        core.debug(`Comment HTML: ${resp.data.html_url}`);
+        core.info(`Comment URL: ${resp.data.url}`);
+        core.info(`Comment HTML: ${resp.data.html_url}`);
     }
     async postPullRequestComment(message) {
         var _a;
@@ -178,7 +183,7 @@ class Action {
             let response;
             const previousComments = await this.listPreviousComments();
             if (!previousComments.length) {
-                core.debug(`No previous comments found, creating a new one...`);
+                core.info(`No previous comments found, creating a new one...`);
                 response = await this.octokit.rest.issues.createComment({
                     ...this.context.repo,
                     issue_number: this.context.payload.pull_request.number,
@@ -186,7 +191,7 @@ class Action {
                 });
             }
             else {
-                core.debug(`Previous comment found, updating...`);
+                core.info(`Previous comment found, updating...`);
                 response = await this.octokit.rest.issues.updateComment({
                     ...this.context.repo,
                     comment_id: previousComments[0].id,
@@ -196,7 +201,7 @@ class Action {
             if (previousComments.length > 1) {
                 const surplusComments = previousComments.slice(1);
                 if (surplusComments.length)
-                    core.debug(`Removing surplus comments. (${surplusComments.length}`);
+                    core.info(`Removing surplus comments. (${surplusComments.length}`);
                 for (const comment of surplusComments) {
                     await this.octokit.rest.issues.deleteComment({
                         ...this.context.repo,
@@ -205,10 +210,10 @@ class Action {
                 }
             }
             if (response) {
-                core.debug(`Post message status: ${response.status}`);
-                core.debug(`Issue URL: ${response.data.issue_url}`);
-                core.debug(`Comment URL: ${response.data.url}`);
-                core.debug(`Comment HTML: ${response.data.html_url}`);
+                core.info(`Post message status: ${response.status}`);
+                core.info(`Issue URL: ${response.data.issue_url}`);
+                core.info(`Comment URL: ${response.data.url}`);
+                core.info(`Comment HTML: ${response.data.html_url}`);
             }
         }
     }
@@ -253,12 +258,32 @@ exports.Action = Action;
 /***/ }),
 
 /***/ 3963:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CoverageReport = void 0;
+const core = __importStar(__nccwpck_require__(2186));
 const interface_1 = __nccwpck_require__(8201);
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
 const coverageParser = __nccwpck_require__(2879);
@@ -302,6 +327,7 @@ class CoverageReport {
         });
         this.enhanceFileReports();
         this.generateOverallReport();
+        core.info(`Report Generated for: ${this.path}`);
         return this;
     }
     enhanceFileReports() {
@@ -375,8 +401,15 @@ class CoverageReport {
     static async generateFileReports(files, types, titles) {
         const coverageReports = [];
         for (let i = 0; i < files.length; i++) {
-            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null, (titles && titles[i]) || files[i]).init();
-            coverageReports.push(coverageReport);
+            try {
+                const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null, (titles && titles[i]) || files[i]).init();
+                coverageReports.push(coverageReport);
+            }
+            catch (e) {
+                core.info('Error Generating Report:');
+                core.info(`${files[i]}`);
+                core.info(`${e}`);
+            }
         }
         return coverageReports;
     }
@@ -386,6 +419,7 @@ class CoverageReport {
             globalReport.filesReport = generatedReports.map(reports => reports.overallReport);
             globalReport.generateOverallReport();
             globalReport.overallReport.title = 'Coverage';
+            core.info('Global Report Generated');
             return globalReport;
         }
         return null;
@@ -506,7 +540,7 @@ async function run() {
         await action.run();
     }
     catch (error) {
-        core.debug(`${error}`);
+        core.info(`${error}`);
     }
 }
 run();

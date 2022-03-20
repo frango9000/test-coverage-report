@@ -6,7 +6,7 @@ async function run(): Promise<void> {
     const action = new Action()
     await action.run()
   } catch (error) {
-    core.debug(`${error}`)
+    core.info(`${error}`)
   }
 }
 

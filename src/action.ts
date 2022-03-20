@@ -97,6 +97,7 @@ export class Action {
         conclusion = 'failure'
       }
     } catch (e) {
+      core.info(`Something went wrong: ${e}`)
       if (this.buildFailEnabled) {
         conclusion = 'failure'
       }
@@ -113,10 +114,14 @@ export class Action {
 
   private async postComment(message: string): Promise<void> {
     if (!this.commentDisabled) {
-      if (this.context.eventName === 'pull_request') {
-        await this.postPullRequestComment(message)
-      } else if (this.context.eventName === 'push') {
-        await this.postCommitComment(message)
+      try {
+        if (this.context.eventName === 'pull_request') {
+          await this.postPullRequestComment(message)
+        } else if (this.context.eventName === 'push') {
+          await this.postCommitComment(message)
+        }
+      } catch (e) {
+        core.info(`Error posting comment: ${e}`)
       }
     }
   }
@@ -129,7 +134,6 @@ export class Action {
     try {
       if (this.getByteLength(render) > 60000) {
         core.info(`Original Report:`)
-        core.info(render)
         core.info('Report exceeded Github size limit. Truncating it.')
         render = render.replace(
           /<details><summary>Expand Report<\/summary>(.+?)<\/details>/g,
@@ -138,7 +142,7 @@ export class Action {
       }
       await this.updateRunCheck(checkRunId, conclusion, render)
     } catch (e) {
-      core.debug('There was an error posting check conclusion.')
+      core.info('There was an error posting check conclusion.')
       await this.updateRunCheck(
         checkRunId,
         conclusion,
@@ -149,7 +153,7 @@ export class Action {
 
   private async postRunCheck(): Promise<CheckResponse> {
     const name = this.getTitle()
-    core.debug('Setting check in progress.')
+    core.info('Setting check in progress.')
     const resp = await this.octokit.rest.checks.create({
       ...this.context.repo,
       head_sha: this.context.sha,
@@ -161,8 +165,8 @@ export class Action {
       }
     })
 
-    core.debug(`Check run URL: ${resp.data.url}`)
-    core.debug(`Check run HTML: ${resp.data.html_url}`)
+    core.info(`Check run URL: ${resp.data.url}`)
+    core.info(`Check run HTML: ${resp.data.html_url}`)
     return resp.data
   }
 
@@ -181,7 +185,7 @@ export class Action {
   ): Promise<CheckResponse> {
     const name = this.getTitle()
     const icon = conclusion === 'success' ? '✔' : '❌'
-    core.debug(`Updating Run Check: ${checkRunId} ${icon}`)
+    core.info(`Updating Run Check: ${checkRunId} ${icon}`)
     const resp = await this.octokit.rest.checks.update({
       ...github.context.repo,
       check_run_id: checkRunId,
@@ -194,20 +198,20 @@ export class Action {
       }
     })
 
-    core.debug(`Update Check run URL: ${resp.data.url}`)
-    core.debug(`Update Check run HTML: ${resp.data.html_url}`)
+    core.info(`Update Check run URL: ${resp.data.url}`)
+    core.info(`Update Check run HTML: ${resp.data.html_url}`)
     return resp.data
   }
 
   private async postCommitComment(message: string): Promise<void> {
-    core.debug(`Posting commit comment.`)
+    core.info(`Posting commit comment.`)
     const resp = await this.octokit.rest.repos.createCommitComment({
       ...this.context.repo,
       commit_sha: this.context.sha,
       body: this.getMessageHeader() + message
     })
-    core.debug(`Comment URL: ${resp.data.url}`)
-    core.debug(`Comment HTML: ${resp.data.html_url}`)
+    core.info(`Comment URL: ${resp.data.url}`)
+    core.info(`Comment HTML: ${resp.data.html_url}`)
   }
 
   private async postPullRequestComment(message: string): Promise<void> {
@@ -216,14 +220,14 @@ export class Action {
       const previousComments = await this.listPreviousComments()
 
       if (!previousComments.length) {
-        core.debug(`No previous comments found, creating a new one...`)
+        core.info(`No previous comments found, creating a new one...`)
         response = await this.octokit.rest.issues.createComment({
           ...this.context.repo,
           issue_number: this.context.payload.pull_request.number,
           body: this.getMessageHeader() + message
         })
       } else {
-        core.debug(`Previous comment found, updating...`)
+        core.info(`Previous comment found, updating...`)
         response = await this.octokit.rest.issues.updateComment({
           ...this.context.repo,
           comment_id: previousComments[0].id,
@@ -234,7 +238,7 @@ export class Action {
       if (previousComments.length > 1) {
         const surplusComments = previousComments.slice(1)
         if (surplusComments.length)
-          core.debug(`Removing surplus comments. (${surplusComments.length}`)
+          core.info(`Removing surplus comments. (${surplusComments.length}`)
         for (const comment of surplusComments) {
           await this.octokit.rest.issues.deleteComment({
             ...this.context.repo,
@@ -243,10 +247,10 @@ export class Action {
         }
       }
       if (response) {
-        core.debug(`Post message status: ${response.status}`)
-        core.debug(`Issue URL: ${response.data.issue_url}`)
-        core.debug(`Comment URL: ${response.data.url}`)
-        core.debug(`Comment HTML: ${response.data.html_url}`)
+        core.info(`Post message status: ${response.status}`)
+        core.info(`Issue URL: ${response.data.issue_url}`)
+        core.info(`Comment URL: ${response.data.url}`)
+        core.info(`Comment HTML: ${response.data.html_url}`)
       }
     }
   }
