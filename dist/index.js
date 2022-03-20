@@ -375,7 +375,7 @@ class CoverageReport {
     static async generateFileReports(files, types, titles) {
         const coverageReports = [];
         for (let i = 0; i < files.length; i++) {
-            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null, (titles && titles[i]) || null).init();
+            const coverageReport = await new CoverageReport(files[i], (types && types[i]) || null, (titles && titles[i]) || files[i]).init();
             coverageReports.push(coverageReport);
         }
         return coverageReports;

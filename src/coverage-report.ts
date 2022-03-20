@@ -162,7 +162,7 @@ export class CoverageReport {
       const coverageReport = await new CoverageReport(
         files[i],
         (types && types[i]) || null,
-        (titles && titles[i]) || null
+        (titles && titles[i]) || files[i]
       ).init()
       coverageReports.push(coverageReport)
     }
