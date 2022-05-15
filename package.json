@@ -34,7 +34,8 @@
     "@actions/core": "1.6.0",
     "@actions/github": "5.0.0",
     "@connectis/coverage-parser": "1.0.8",
-    "@frango9000/html-builder": "0.0.3"
+    "@frango9000/html-builder": "0.0.3",
+    "fast-glob": "3.2.11"
   },
   "devDependencies": {
     "@octokit/types": "6.34.0",
@@ -44,7 +45,7 @@
     "@vercel/ncc": "0.33.1",
     "eslint": "8.7.0",
     "eslint-plugin-github": "4.3.5",
-    "eslint-plugin-jest": "26.0.0",
+    "eslint-plugin-jest": "26.2.2",
     "eslint-plugin-prettier": "4.0.0",
     "jest": "27.4.7",
     "js-yaml": "4.1.0",
