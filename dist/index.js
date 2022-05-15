@@ -33,7 +33,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Action = void 0;
+exports.findFiles = exports.Action = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 const interface_1 = __nccwpck_require__(8201);
@@ -85,13 +85,13 @@ class Action {
             : this.path;
         let reportFiles = [];
         try {
-            reportFiles = await this.findFiles(pathPatterns);
+            reportFiles = findFiles(pathPatterns);
         }
         catch (e) {
             this.failOrWarn('There was an error searching for coverage files');
             return;
         }
-        if (!reportFiles.length && this.buildFailEnabled) {
+        if (!reportFiles.length) {
             this.failOrWarn('No Coverage Files Found');
             return;
         }
@@ -286,23 +286,24 @@ class Action {
         }
         return path.trim().replace(/\\/g, '/');
     }
-    async findFiles(pathPatterns) {
-        const paths = [];
-        for (const pattern of pathPatterns) {
-            try {
-                const paths = await (0, fast_glob_1.default)(pattern, { dot: true });
-                for (const path of paths) {
-                    paths.push(path);
-                }
-            }
-            catch (error) {
-                core.info(`Failed to find files with pattern: ${pattern}`);
-            }
-        }
-        return paths;
-    }
 }
 exports.Action = Action;
+function findFiles(pathPatterns) {
+    const paths = [];
+    for (const pattern of pathPatterns) {
+        try {
+            paths.push(...fast_glob_1.default.sync(pattern, {
+                onlyFiles: true,
+                dot: true
+            }));
+        }
+        catch (error) {
+            core.info(`Failed to find files with pattern: ${pattern}`);
+        }
+    }
+    return paths;
+}
+exports.findFiles = findFiles;
 
 
 /***/ }),

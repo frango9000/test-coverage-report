@@ -71,13 +71,13 @@ export class Action {
     let reportFiles: string[] = []
 
     try {
-      reportFiles = await this.findFiles(pathPatterns)
+      reportFiles = findFiles(pathPatterns)
     } catch (e) {
       this.failOrWarn('There was an error searching for coverage files')
       return
     }
 
-    if (!reportFiles.length && this.buildFailEnabled) {
+    if (!reportFiles.length) {
       this.failOrWarn('No Coverage Files Found')
       return
     }
@@ -92,9 +92,8 @@ export class Action {
         check = await this.postRunCheck()
       }
 
-      const generatedReports = await CoverageReport.generateFileReports(
-        reportFiles
-      )
+      const generatedReports: CoverageReport[] =
+        await CoverageReport.generateFileReports(reportFiles)
 
       const globalReport: CoverageReport | null =
         CoverageReport.generateGlobalReport(generatedReports)
@@ -330,19 +329,21 @@ export class Action {
 
     return path.trim().replace(/\\/g, '/')
   }
+}
 
-  private async findFiles(pathPatterns: string[]): Promise<string[]> {
-    const paths: string[] = []
-    for (const pattern of pathPatterns) {
-      try {
-        const paths = await glob(pattern, {dot: true})
-        for (const path of paths) {
-          paths.push(path)
-        }
-      } catch (error) {
-        core.info(`Failed to find files with pattern: ${pattern}`)
-      }
+export function findFiles(pathPatterns: string[]): string[] {
+  const paths: string[] = []
+  for (const pattern of pathPatterns) {
+    try {
+      paths.push(
+        ...glob.sync(pattern, {
+          onlyFiles: true,
+          dot: true
+        })
+      )
+    } catch (error) {
+      core.info(`Failed to find files with pattern: ${pattern}`)
     }
-    return paths
   }
+  return paths
 }
