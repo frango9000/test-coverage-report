@@ -49,7 +49,7 @@ export class Renderer {
     for (let i = 0; i < reports.length; i++) {
       const report: CoverageReport = reports[i]
       reportRender += fragment(
-        p(),
+        p(report.path),
         this.renderOverallCoverage(report, 'Report', this.minCoverage.report),
         this.renderFilesCoverage(report),
         i !== reports.length - 1 ? hr() : ''

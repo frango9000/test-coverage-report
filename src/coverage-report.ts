@@ -15,7 +15,7 @@ export class CoverageReport {
   private _overallReport!: FileCoverageReport
   private _type?: string
 
-  constructor(private readonly path: string, public global = false) {
+  constructor(readonly path: string, public global = false) {
     if (global) {
       this._type = 'global'
     } else {

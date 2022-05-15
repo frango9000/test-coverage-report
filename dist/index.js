@@ -632,7 +632,7 @@ class Renderer {
         let reportRender = '';
         for (let i = 0; i < reports.length; i++) {
             const report = reports[i];
-            reportRender += (0, html_builder_1.fragment)((0, html_builder_1.p)(), this.renderOverallCoverage(report, 'Report', this.minCoverage.report), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
+            reportRender += (0, html_builder_1.fragment)((0, html_builder_1.p)(report.path), this.renderOverallCoverage(report, 'Report', this.minCoverage.report), this.renderFilesCoverage(report), i !== reports.length - 1 ? (0, html_builder_1.hr)() : '');
         }
         return reportRender;
     }
