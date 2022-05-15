@@ -13,6 +13,7 @@ import {Context} from '@actions/github/lib/context'
 import {CoverageReport} from './coverage-report'
 import {GitHub} from '@actions/github/lib/utils'
 import {Renderer} from './renderer'
+import glob from 'fast-glob'
 import {p} from '@frango9000/html-builder'
 
 export class Action {
@@ -27,11 +28,15 @@ export class Action {
   readonly buildFailEnabled = getInputAsBoolean(Inputs.ENABLE_BUILD_FAIL, {
     required: true
   })
-  readonly reportFiles: string[] = getInputAsArray(Inputs.REPORT_FILES, {
+  readonly path: string[] = getInputAsArray(Inputs.REPORT_PATHS, {
     required: true
   })
-  readonly reportTypes: string[] = getInputAsArray(Inputs.REPORT_TYPES) || []
-  readonly reportTitles: string[] = getInputAsArray(Inputs.REPORT_TITLES) || []
+  readonly pathReplaceBackslashes = getInputAsBoolean(
+    Inputs.REPORT_PATHS_REPLACE_BACKSLASHES,
+    {
+      required: false
+    }
+  )
 
   readonly minCoverage: CoverageRequirements = {
     file: {
@@ -54,24 +59,41 @@ export class Action {
   }
 
   async run(): Promise<void> {
-    if (!this.reportFiles && this.buildFailEnabled) {
-      core.setFailed('No Coverage Files Found')
+    if (!this.path.length) {
+      this.failOrWarn('No Coverage Files Provided')
+      return
+    }
+
+    const pathPatterns = this.pathReplaceBackslashes
+      ? this.path.map(this.replaceBackslashes.bind(this))
+      : this.path
+
+    let reportFiles: string[] = []
+
+    try {
+      reportFiles = await this.findFiles(pathPatterns)
+    } catch (e) {
+      this.failOrWarn('There was an error searching for coverage files')
+      return
+    }
+
+    if (!reportFiles.length && this.buildFailEnabled) {
+      this.failOrWarn('No Coverage Files Found')
+      return
     }
 
     let render = ''
-
     let check
     let conclusion: 'success' | 'failure' = 'success'
     let unmetRequirements: UnmetRequirement[] = []
-    if (this.context.eventName === 'pull_request') {
-      check = await this.postRunCheck()
-    }
 
     try {
+      if (this.context.eventName === 'pull_request') {
+        check = await this.postRunCheck()
+      }
+
       const generatedReports = await CoverageReport.generateFileReports(
-        this.reportFiles,
-        this.reportTypes,
-        this.reportTitles
+        reportFiles
       )
 
       const globalReport: CoverageReport | null =
@@ -110,6 +132,10 @@ export class Action {
         core.setFailed(JSON.stringify({unmetRequirements}))
       }
     }
+  }
+
+  private failOrWarn(message: string): void {
+    ;(this.buildFailEnabled ? core.setFailed : core.info)(message)
   }
 
   private async postComment(message: string): Promise<void> {
@@ -295,5 +321,24 @@ export class Action {
 
   private getByteLength(text: string): number {
     return Buffer.byteLength(text, 'utf8')
+  }
+
+  private replaceBackslashes(path: string): string {
+    if (!path) {
+      return path
+    }
+
+    return path.trim().replace(/\\/g, '/')
+  }
+
+  private async findFiles(pathPatterns: string[]): Promise<string[]> {
+    const paths: string[] = []
+    for (const pattern of pathPatterns) {
+      const paths = await glob(pattern, {dot: true})
+      for (const path of paths) {
+        paths.push(path)
+      }
+    }
+    return paths
   }
 }

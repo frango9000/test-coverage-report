@@ -26,12 +26,12 @@ describe('Coverage Report Class', () => {
   describe('Get type by file extension', () => {
     it('should use jacoco coverage if type is not provided and file extension is xml', () => {
       const jacoco = new CoverageReport(`jacoco.${ReportExtension.JACOCO}`)
-      expect(jacoco['type']).toBe(ReportType.JACOCO)
+      expect(jacoco['_type']).toBe(ReportType.JACOCO)
     })
 
     it('should use lcov coverage if type is not provided and file extension is lcov', () => {
       const jacoco = new CoverageReport(`coverage.${ReportExtension.LCOV}`)
-      expect(jacoco['type']).toBe(ReportType.LCOV)
+      expect(jacoco['_type']).toBe(ReportType.LCOV)
     })
 
     it('should throw if extension does not match supported reports', () => {
@@ -39,20 +39,15 @@ describe('Coverage Report Class', () => {
     })
 
     it('should throw if file type provided is not suported', () => {
-      expect(() => new CoverageReport('coverage.json', 'clover')).toThrow()
-      expect(
-        () => new CoverageReport('coverage.json', 'golang-cover')
-      ).toThrow()
-      expect(() => new CoverageReport('coverage.json', 'cobertura')).toThrow()
+      expect(() => new CoverageReport('coverage.clover')).toThrow()
+      expect(() => new CoverageReport('coverage.cover')).toThrow()
+      expect(() => new CoverageReport('coverage.cobertura')).toThrow()
     })
   })
 
   describe('Jacoco Fixture', () => {
     beforeEach(() => {
-      coverageReport = new CoverageReport(
-        './__tests__/__fixtures__/jacoco.xml',
-        ReportType.JACOCO
-      )
+      coverageReport = new CoverageReport('./__tests__/__fixtures__/jacoco.xml')
     })
 
     it('should load and enhance report data on init', async () => {
@@ -74,10 +69,7 @@ describe('Coverage Report Class', () => {
 
   describe('Lcov Fixture', () => {
     beforeEach(() => {
-      coverageReport = new CoverageReport(
-        './__tests__/__fixtures__/lcov.info',
-        ReportType.LCOV
-      )
+      coverageReport = new CoverageReport('./__tests__/__fixtures__/lcov.info')
     })
 
     it('should load and enhance report data on init', async () => {
@@ -99,13 +91,10 @@ describe('Coverage Report Class', () => {
     let coverageReports: CoverageReport[]
 
     beforeEach(async () => {
-      coverageReports = await CoverageReport.generateFileReports(
-        [
-          './__tests__/__fixtures__/jacoco.xml',
-          './__tests__/__fixtures__/lcov.info'
-        ],
-        [ReportType.JACOCO, ReportType.LCOV]
-      )
+      coverageReports = await CoverageReport.generateFileReports([
+        './__tests__/__fixtures__/jacoco.xml',
+        './__tests__/__fixtures__/lcov.info'
+      ])
     })
 
     it('should generate multiple file reports', () => {

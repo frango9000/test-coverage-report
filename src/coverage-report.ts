@@ -5,7 +5,6 @@ import {
   FileCoverageSummary,
   ReportExtension,
   ReportType,
-  SupportedReports,
   UnmetRequirement
 } from './interface'
 // eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs
@@ -14,27 +13,22 @@ const coverageParser = require('@connectis/coverage-parser')
 export class CoverageReport {
   private _filesReport: FileCoverageReport[] = []
   private _overallReport!: FileCoverageReport
+  private _type?: string
 
-  constructor(
-    private readonly path: string,
-    private type?: ReportType | string | null,
-    public title?: string | null
-  ) {
-    if (!this.type) {
+  constructor(private readonly path: string, public global = false) {
+    if (global) {
+      this._type = 'global'
+    } else {
       const extension = path.split('.').pop()
       switch (extension) {
         case ReportExtension.JACOCO:
-          this.type = ReportType.JACOCO
+          this._type = ReportType.JACOCO
           break
         case ReportExtension.LCOV:
-          this.type = ReportType.LCOV
+          this._type = ReportType.LCOV
           break
         default:
           throw Error('Unsupported Report')
-      }
-    } else {
-      if (!SupportedReports.includes(this.type)) {
-        throw Error('Unsupported Report')
       }
     }
   }
@@ -53,7 +47,7 @@ export class CoverageReport {
 
   async init(): Promise<CoverageReport> {
     this._filesReport = await coverageParser.parseFile(this.path, {
-      type: this.type
+      type: this._type
     })
     this.enhanceFileReports()
     this.generateOverallReport()
@@ -154,23 +148,15 @@ export class CoverageReport {
     return overallCoverageReport
   }
 
-  static async generateFileReports(
-    files: string[],
-    types?: string[],
-    titles?: string[]
-  ): Promise<CoverageReport[]> {
+  static async generateFileReports(files: string[]): Promise<CoverageReport[]> {
     const coverageReports: CoverageReport[] = []
-    for (let i = 0; i < files.length; i++) {
+    for (const item of files) {
       try {
-        const coverageReport = await new CoverageReport(
-          files[i],
-          (types && types[i]) || null,
-          (titles && titles[i]) || files[i]
-        ).init()
+        const coverageReport = await new CoverageReport(item).init()
         coverageReports.push(coverageReport)
       } catch (e) {
         core.info('Error Generating Report:')
-        core.info(`${files[i]}`)
+        core.info(`${item}`)
         core.info(`${e}`)
       }
     }
@@ -181,7 +167,7 @@ export class CoverageReport {
     generatedReports: CoverageReport[]
   ): CoverageReport | null {
     if (generatedReports.length > 1) {
-      const globalReport = new CoverageReport('', 'global')
+      const globalReport = new CoverageReport('', true)
       globalReport.filesReport = generatedReports.map(
         reports => reports.overallReport
       )

@@ -34,7 +34,8 @@
     "@actions/core": "1.6.0",
     "@actions/github": "5.0.0",
     "@connectis/coverage-parser": "1.0.8",
-    "@frango9000/html-builder": "0.0.3"
+    "@frango9000/html-builder": "0.0.3",
+    "fast-glob": "3.2.11"
   },
   "devDependencies": {
     "@octokit/types": "6.34.0",

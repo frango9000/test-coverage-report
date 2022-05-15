@@ -1,17 +1,14 @@
 export enum ReportType {
   JACOCO = 'jacoco',
-  LCOV = 'lcov'
+  LCOV = 'lcov',
+  GLOBAL = 'global'
 }
 
 export enum ReportExtension {
   JACOCO = 'xml',
-  LCOV = 'info'
+  LCOV = 'info',
+  GLOBAL = ''
 }
-
-export const SupportedReports = [
-  ...Object.values(ReportType).map(value => String(value)),
-  'global'
-]
 
 export interface CheckResponse {
   id: number
@@ -67,9 +64,8 @@ export enum Inputs {
   DISABLE_COMMENT = 'disable-comment',
   ENABLE_BUILD_FAIL = 'enable-build-fail',
 
-  REPORT_FILES = 'report-files',
-  REPORT_TYPES = 'report-types',
-  REPORT_TITLES = 'report-titles',
+  REPORT_PATHS = 'report-paths',
+  REPORT_PATHS_REPLACE_BACKSLASHES = 'report-paths-replace-backslashes',
 
   FILE_COVERAGE_ERROR_MIN = 'file-coverage-error-min',
   FILE_COVERAGE_WARN_MIN = 'file-coverage-warn-min',
