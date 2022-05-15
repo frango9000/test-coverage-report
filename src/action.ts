@@ -334,9 +334,13 @@ export class Action {
   private async findFiles(pathPatterns: string[]): Promise<string[]> {
     const paths: string[] = []
     for (const pattern of pathPatterns) {
-      const paths = await glob(pattern, {dot: true})
-      for (const path of paths) {
-        paths.push(path)
+      try {
+        const paths = await glob(pattern, {dot: true})
+        for (const path of paths) {
+          paths.push(path)
+        }
+      } catch (error) {
+        core.info(`Failed to find files with pattern: ${pattern}`)
       }
     }
     return paths

@@ -48,5 +48,5 @@ inputs:
     description: 'Minimal global coverage required recommended. Will warn if multiple reports received and threshold not met. Ignored if only one report file received'
     required: false
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
