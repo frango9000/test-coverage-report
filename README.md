@@ -28,12 +28,7 @@ for [Creating a workflow file](https://help.github.com/en/articles/configuring-a
   request
 - `disable-comment` - [*optional*] set to true if you do not want to post a
   comment
-- `report-files` - [**required**] List of paths to the coverage report files
-- `report-types` - [*optional*] List of types of report ('lcov' | 'jacoco'), in
-  the same order as the report-types. If not provided will try to detect by the
-  file extension
-- `report-titles` - [*optional*] List of titles for each report, in the same
-  order as the report-types.
+- `report-paths` - [**required**] List of paths to the coverage report files
 - `enable-build-fail` - [*optional*] set to true if want to enforce provided
   minimum coverage failing the build if not met.
 - `file-coverage-error-min` - [*optional*] The minimum code coverage that is
@@ -80,7 +75,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "App Name"
-          report-files: ./targer/target/site/jacoco-ut/jacoco.xml
+          report-paths: ./targer/target/site/jacoco-ut/jacoco.xml
           # report-types: jacoco         #not needed, if jacoco report has .xml extension or lcov report has .info
           file-coverage-error-min: 60
           file-coverage-warn-min: 80
@@ -128,7 +123,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Frontend and Backend"
           disable-comment: ${{ github.event_name == 'push' }}    # Only post on pull request, not on commit
-          report-files: |
+          report-paths: |
             ./targer/target/site/jacoco-ut/jacoco.xml
             ./targer/target/site/jacoco-it/jacoco.xml
             ./coverage/frontend/lcov.info

@@ -7,7 +7,7 @@ jobs:
   build: # make sure build/ci work properly
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.1.0
       - run: |
           npm install
       - run: |
@@ -16,18 +16,18 @@ jobs:
       - uses: ./
         with:
           title: 'Source Code Coverage'
-          report-files: |
+          report-paths: |
             ./coverage/lcov.info
 
   test: # make sure the action works on a clean machine without building
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.1.0
 
       - uses: ./
         with:
           title: 'Jacoco Fixture Coverage'
-          report-files: |
+          report-paths: |
             ./__tests__/__fixtures__/jacoco.xml
           file-coverage-error-min: 60
           file-coverage-warn-min: 80
@@ -37,7 +37,7 @@ jobs:
       - uses: ./
         with:
           title: 'Lcov Fixture Coverage'
-          report-files: |
+          report-paths: |
             ./__tests__/__fixtures__/lcov.info
           file-coverage-error-min: 60
           file-coverage-warn-min: 80
@@ -47,15 +47,9 @@ jobs:
       - uses: ./
         with:
           title: 'Multi Fixture'
-          report-files: |
+          report-paths: |
             ./__tests__/__fixtures__/jacoco.xml
             ./__tests__/__fixtures__/lcov.info
-          report-types: |
-            jacoco
-            lcov
-          report-titles: |
-            Backend Coverage
-            Frontend Coverage
           file-coverage-error-min: 60
           file-coverage-warn-min: 80
           report-coverage-error-min: 50

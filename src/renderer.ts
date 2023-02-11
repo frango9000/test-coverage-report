@@ -149,6 +149,6 @@ export class Renderer {
     if (requirements.warn && requirements.warn > (percentage || 0)) {
       return '⚠️'
     }
-    return '✔️'
+    return '✅'
   }
 }
